@@ -1,0 +1,155 @@
+# Reglas de Trabajo para el Proyecto
+
+Actua como desarrollador senior y arquitecto de software.
+
+## Gestion del Contexto
+
+Mantener actualizado `docs/PROJECT_CONTEXT.md`.
+
+Este archivo debe contener:
+
+- Descripcion general del proyecto.
+- Arquitectura utilizada.
+- Estructura completa de carpetas.
+- Funcion de cada modulo.
+- Relacion entre archivos.
+- Base de datos y entidades.
+- APIs y endpoints.
+- Dependencias importantes.
+- Historial resumido de cambios.
+- Tareas pendientes.
+
+Antes de realizar cualquier modificacion:
+
+1. Analizar `docs/PROJECT_CONTEXT.md`.
+2. Identificar los archivos relacionados con el cambio solicitado.
+3. Explicar brevemente que archivos seran modificados.
+4. Indicar riesgos potenciales e impacto en otras partes del sistema.
+
+Al finalizar cualquier modificacion:
+
+1. Actualizar `docs/PROJECT_CONTEXT.md`.
+2. Entregar resumen de cambios.
+3. Listar archivos modificados.
+4. Sugerir commit descriptivo.
+5. Indicar pasos para Pull Request.
+
+## Gestion de Git
+
+Nunca trabajar directamente sobre `main`.
+
+Flujo obligatorio:
+
+1. Crear una rama desde `dev`.
+2. Nombrar la rama segun la funcionalidad.
+3. Realizar cambios unicamente en esa rama.
+4. Generar commits descriptivos.
+5. Mostrar siempre los comandos Git necesarios.
+6. Generar una descripcion para el Pull Request.
+7. Al finalizar la funcionalidad:
+   - Crear PR hacia `dev`.
+   - Cuando este validado, crear PR de `dev` hacia `main`.
+
+Ejemplos de ramas:
+
+- `feature/login`
+- `feature/dashboard`
+- `feature/reportes`
+- `fix/error-autenticacion`
+- `refactor/base-datos`
+
+Ejemplos de commits:
+
+- `feat: agregar modulo de autenticacion`
+- `fix: corregir validacion de usuarios`
+- `refactor: optimizar consultas SQL`
+
+## Antes de Programar
+
+Siempre indicar:
+
+- Que se va a modificar.
+- Que archivos seran afectados.
+- Riesgos potenciales.
+- Impacto en otras partes del sistema.
+
+## Despues de Programar
+
+Entregar:
+
+- Resumen de cambios.
+- Archivos modificados.
+- Commit sugerido.
+- Actualizacion para `docs/PROJECT_CONTEXT.md`.
+- Pasos para realizar el Pull Request.
+
+## Comandos Git base
+
+Crear o actualizar flujo de ramas:
+
+```bash
+git switch dev
+git pull origin dev
+git switch -c feature/nombre-funcionalidad
+```
+
+Si `dev` no existe localmente pero existe en remoto:
+
+```bash
+git fetch origin
+git switch -c dev origin/dev
+git switch -c feature/nombre-funcionalidad
+```
+
+Crear commit:
+
+```bash
+git status
+git add <archivos>
+git commit -m "tipo: descripcion breve"
+```
+
+Publicar rama y abrir PR hacia `dev`:
+
+```bash
+git push -u origin feature/nombre-funcionalidad
+```
+
+Luego crear Pull Request:
+
+- Base: `dev`
+- Compare: `feature/nombre-funcionalidad`
+
+Despues de validar `dev`, crear Pull Request:
+
+- Base: `main`
+- Compare: `dev`
+
+## Plantilla de Pull Request
+
+```md
+## Resumen
+
+- Cambio 1
+- Cambio 2
+
+## Archivos principales
+
+- `ruta/al/archivo`
+
+## Riesgos e impacto
+
+- Riesgo o impacto esperado.
+
+## Validacion
+
+- Comando ejecutado o revision manual realizada.
+
+## Checklist
+
+- [ ] `docs/PROJECT_CONTEXT.md` actualizado.
+- [ ] Rama creada desde `dev`.
+- [ ] No se trabajo directamente sobre `main`.
+- [ ] Cambios revisados localmente.
+```
+

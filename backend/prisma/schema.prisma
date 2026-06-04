@@ -1,0 +1,94 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  email         String         @unique
+  name          String?
+  password      String
+  role          Role           @default(USER)
+  phone         String?
+  address       String?
+  faculty       String?
+  semester      Int?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  citas         Cita[]         @relation("StudentCitas")
+  citasAsProf   Cita[]         @relation("ProfCitas")
+  notifications Notification[]
+  availableSlots AvailableSlot[] @relation("ProfSlots")
+
+  @@map("users")
+}
+
+model Cita {
+  id             Int        @id @default(autoincrement())
+  studentId      Int
+  professionalId Int
+  date           DateTime
+  type           String     @default("Consulta General")
+  mode           String     @default("Presencial")
+  location       String?
+  status         CitaStatus @default(PENDIENTE)
+  notes          String?
+  psychNotes     String?
+  studentPhone   String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  student        User       @relation("StudentCitas", fields: [studentId], references: [id])
+  professional   User       @relation("ProfCitas", fields: [professionalId], references: [id])
+
+  @@map("citas")
+}
+
+model AvailableSlot {
+  id             Int      @id @default(autoincrement())
+  professionalId Int
+  dayOfWeek      Int      // 0=Dom, 1=Lun, ..., 6=Sáb
+  startHour      Int      // hora en minutos desde medianoche (ej: 480 = 8:00 AM)
+  endHour        Int      // hora en minutos desde medianoche (ej: 660 = 11:00 AM)
+  durationMin    Int      @default(50) // duración de cada bloque en minutos
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  professional   User     @relation("ProfSlots", fields: [professionalId], references: [id])
+
+  @@map("available_slots")
+}
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+enum Role {
+  USER
+  ADMIN
+  PSYCHOLOGIST
+}
+
+enum CitaStatus {
+  PENDIENTE
+  CONFIRMADA
+  CANCELADA
+  COMPLETADA
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
