@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import {
   Calendar, Clock, ArrowRight, Brain, Heart, Sparkles,
-  CheckCircle, XCircle, FileText, TrendingUp, Phone,
+  CheckCircle, FileText, Phone, Users, UserCheck,
+  ShieldCheck, BarChart3, AlertTriangle, TrendingUp,
+  ChevronRight, Bell,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { citasApi, Cita } from '../api/citas';
+import api from '../api/axios';
 
 const statusColors: Record<string, string> = {
   PENDIENTE:  'bg-yellow-100 text-yellow-800 border-yellow-200',
@@ -23,6 +26,151 @@ const wellnessTips = [
   { icon: Heart,    title: 'Autocuidado diario',      description: 'Reserva tiempo para actividades que disfrutes y te recarguen.' },
   { icon: Sparkles, title: 'Metas pequeñas',          description: 'Divide tus objetivos en pasos manejables. Cada logro cuenta.' },
 ];
+
+// ─── Vista del ADMIN ─────────────────────────────────────────────────────────
+const AdminDashboard = ({ user }: { user: any }) => {
+  const navigate = useNavigate();
+  const [stats, setStats]   = useState<any>(null);
+  const [citas, setCitas]   = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      api.get('/admin/stats').then(r => r.data).catch(() => null),
+      api.get('/admin/citas?limit=5').then(r => r.data).catch(() => ({ data: [] })),
+    ]).then(([s, c]) => {
+      setStats(s);
+      setCitas(c?.data ?? []);
+      setLoading(false);
+    });
+  }, []);
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Buenos días' : hour < 18 ? 'Buenas tardes' : 'Buenas noches';
+
+  if (loading) return (
+    <div className="flex justify-center py-20">
+      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  const statCards = [
+    { label: 'Estudiantes',    value: stats?.totalUsers ?? 0,        color: 'bg-blue-50 text-blue-600',    icon: Users },
+    { label: 'Total citas',    value: stats?.totalCitas ?? 0,        color: 'bg-purple-50 text-purple-600', icon: Calendar },
+    { label: 'Completadas',    value: stats?.citasCompletadas ?? 0,  color: 'bg-green-50 text-green-600',   icon: CheckCircle },
+    { label: 'Pendientes',     value: stats?.citasPendientes ?? 0,   color: 'bg-yellow-50 text-yellow-600', icon: Clock },
+    { label: 'Este mes',       value: stats?.citasThisMonth ?? 0,    color: 'bg-indigo-50 text-indigo-600', icon: TrendingUp },
+    { label: 'Alertas SOS',    value: stats?.sosAlerts ?? 0,         color: 'bg-red-50 text-red-600',       icon: AlertTriangle },
+  ];
+
+  const quickActions = [
+    { label: 'Usuarios',        desc: 'Gestionar roles y cuentas',  icon: Users,      path: '/admin',        color: 'bg-blue-500' },
+    { label: 'Todas las citas', desc: 'Ver y filtrar citas',        icon: Calendar,   path: '/appointments', color: 'bg-purple-500' },
+    { label: 'Reportes',        desc: 'Actividad de psicólogos',    icon: BarChart3,  path: '/admin',        color: 'bg-indigo-500' },
+    { label: 'Notificaciones',  desc: 'Ver alertas del sistema',    icon: Bell,       path: '/notifications',color: 'bg-orange-500' },
+  ];
+
+  return (
+    <div className="max-w-5xl mx-auto py-8 px-4 space-y-6">
+
+      {/* Saludo */}
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <ShieldCheck size={18} className="text-primary" />
+          </div>
+          <span className="text-sm font-semibold text-primary uppercase tracking-wider">Panel Administrativo</span>
+        </div>
+        <h1 className="text-3xl font-display font-black text-on-surface">
+          {greeting}, {user?.name?.split(' ')[0] ?? 'Admin'} 👋
+        </h1>
+        <p className="text-on-surface-variant mt-1">
+          Aquí tienes un resumen del estado actual de la plataforma.
+        </p>
+      </motion.div>
+
+      {/* Estadísticas */}
+      <div>
+        <h2 className="font-display font-bold text-on-surface mb-3 text-sm uppercase tracking-wide text-outline">
+          Estadísticas generales
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {statCards.map((s, i) => (
+            <motion.div key={s.label}
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
+              className="bg-white rounded-2xl border border-outline-variant/20 shadow-sm p-5 flex items-center gap-4">
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${s.color}`}>
+                <s.icon size={20} />
+              </div>
+              <div>
+                <p className="text-2xl font-black text-on-surface">{s.value}</p>
+                <p className="text-xs text-on-surface-variant">{s.label}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      {/* Accesos rápidos */}
+      <div>
+        <h2 className="font-display font-bold text-on-surface mb-3 text-sm uppercase tracking-wide text-outline">
+          Accesos rápidos
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {quickActions.map((a, i) => (
+            <motion.button key={a.label}
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 + i * 0.07 }}
+              onClick={() => navigate(a.path)}
+              className="flex flex-col items-start p-4 rounded-2xl text-white hover:opacity-90 transition-opacity text-left shadow-sm"
+              style={{ background: `var(--color-${a.color.replace('bg-', '')}, #6366f1)` }}
+            >
+              <div className={`${a.color} bg-white/20 w-10 h-10 rounded-xl flex items-center justify-center mb-3`}>
+                <a.icon size={20} className="text-white" />
+              </div>
+              <p className="font-bold text-sm">{a.label}</p>
+              <p className="text-xs opacity-75 mt-0.5">{a.desc}</p>
+            </motion.button>
+          ))}
+        </div>
+      </div>
+
+      {/* Citas recientes */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
+        className="bg-white rounded-2xl border border-outline-variant/20 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant/10">
+          <h3 className="font-display font-bold text-on-surface">Citas recientes</h3>
+          <button onClick={() => navigate('/appointments')}
+            className="text-sm text-primary font-bold hover:underline flex items-center gap-1">
+            Ver todas <ChevronRight size={14} />
+          </button>
+        </div>
+        {citas.length === 0 ? (
+          <p className="text-center text-on-surface-variant py-10 text-sm">No hay citas registradas.</p>
+        ) : (
+          <div className="divide-y divide-outline-variant/10">
+            {citas.map(c => (
+              <div key={c.id} className="flex items-center gap-4 px-5 py-3.5">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
+                  {c.student?.name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-on-surface text-sm truncate">{c.student?.name}</p>
+                  <p className="text-xs text-outline truncate">
+                    {c.type} · {c.professional?.name} · {new Date(c.date).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full font-bold border shrink-0 ${statusColors[c.status]}`}>
+                  {statusLabels[c.status]}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+
+    </div>
+  );
+};
 
 // ─── Vista del ESTUDIANTE ────────────────────────────────────────────────────
 const StudentDashboard = ({ user }: { user: any }) => {
@@ -49,11 +197,14 @@ const StudentDashboard = ({ user }: { user: any }) => {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Buenos días' : hour < 18 ? 'Buenas tardes' : 'Buenas noches';
 
-  if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return (
+    <div className="flex justify-center py-20">
+      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
-      {/* Saludo */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-display font-black text-on-surface">
           {greeting}, {user?.name?.split(' ')[0] ?? 'Usuario'} 👋
@@ -61,7 +212,6 @@ const StudentDashboard = ({ user }: { user: any }) => {
         <p className="text-on-surface-variant mt-1">Tu bienestar mental es lo más importante.</p>
       </motion.div>
 
-      {/* Próxima cita */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
         {nextCita ? (
           <div className="bg-gradient-to-br from-primary to-primary/80 p-6 rounded-2xl text-white shadow-lg">
@@ -97,7 +247,6 @@ const StudentDashboard = ({ user }: { user: any }) => {
         )}
       </motion.div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 gap-4">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
           className="bg-white rounded-2xl border border-outline-variant/20 shadow-sm p-5 flex items-center gap-4">
@@ -121,23 +270,21 @@ const StudentDashboard = ({ user }: { user: any }) => {
         </motion.div>
       </div>
 
-      {/* Acciones rápidas */}
       <div className="grid grid-cols-2 gap-4">
         <button onClick={() => navigate('/appointments')}
-          className="bg-primary text-white rounded-2xl p-5 hover:bg-primary/90 transition-colors group text-left">
+          className="bg-primary text-white rounded-2xl p-5 hover:bg-primary/90 transition-colors text-left">
           <Calendar size={22} className="mb-3" />
           <p className="font-bold text-sm">Agendar cita</p>
           <p className="text-xs opacity-75 mt-1">Con un profesional disponible</p>
         </button>
         <button onClick={() => navigate('/urgent-help')}
-          className="bg-red-500 text-white rounded-2xl p-5 hover:bg-red-600 transition-colors group text-left">
+          className="bg-red-500 text-white rounded-2xl p-5 hover:bg-red-600 transition-colors text-left">
           <Phone size={22} className="mb-3" />
           <p className="font-bold text-sm">Ayuda urgente</p>
           <p className="text-xs opacity-75 mt-1">Recursos de crisis inmediatos</p>
         </button>
       </div>
 
-      {/* Consejos */}
       <div>
         <h2 className="font-display font-bold text-on-surface mb-3">Consejos de bienestar</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -201,7 +348,11 @@ const PsychologistDashboard = ({ user }: { user: any }) => {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return (
+    <div className="flex justify-center py-20">
+      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
@@ -212,7 +363,6 @@ const PsychologistDashboard = ({ user }: { user: any }) => {
         <p className="text-on-surface-variant mt-1">Gestiona tus citas y observaciones clínicas.</p>
       </motion.div>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
           { label: 'Citas hoy',   value: citas.filter(c => new Date(c.date).toDateString() === new Date().toDateString()).length, color: 'bg-primary/10 text-primary',       icon: Calendar },
@@ -232,7 +382,6 @@ const PsychologistDashboard = ({ user }: { user: any }) => {
         ))}
       </div>
 
-      {/* Citas próximas */}
       <div className="bg-white rounded-2xl border border-outline-variant/20 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant/10">
           <h3 className="font-display font-bold text-on-surface">Citas pendientes</h3>
@@ -262,7 +411,6 @@ const PsychologistDashboard = ({ user }: { user: any }) => {
         )}
       </div>
 
-      {/* Historial completadas */}
       {completadas.length > 0 && (
         <div className="bg-white rounded-2xl border border-outline-variant/20 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant/10">
@@ -292,7 +440,6 @@ const PsychologistDashboard = ({ user }: { user: any }) => {
         </div>
       )}
 
-      {/* Modal de cita */}
       <AnimatePresence>
         {selectedCita && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -306,25 +453,18 @@ const PsychologistDashboard = ({ user }: { user: any }) => {
                 </div>
                 <button onClick={() => setSelectedCita(null)} className="text-outline hover:text-on-surface p-1">✕</button>
               </div>
-
               {selectedCita.notes && (
                 <div className="bg-surface-container rounded-xl p-3">
                   <p className="text-xs font-bold text-on-surface-variant mb-1">Notas del estudiante</p>
                   <p className="text-sm text-on-surface">{selectedCita.notes}</p>
                 </div>
               )}
-
               <div>
                 <label className="text-xs font-bold text-on-surface-variant mb-2 block">Observaciones clínicas (solo visibles para ti)</label>
-                <textarea
-                  value={psychNotes}
-                  onChange={e => setPsychNotes(e.target.value)}
-                  rows={4}
+                <textarea value={psychNotes} onChange={e => setPsychNotes(e.target.value)} rows={4}
                   placeholder="Escribe tus observaciones, diagnóstico, plan de tratamiento..."
-                  className="w-full px-4 py-3 border border-outline-variant/30 rounded-xl text-sm focus:outline-none focus:border-primary resize-none"
-                />
+                  className="w-full px-4 py-3 border border-outline-variant/30 rounded-xl text-sm focus:outline-none focus:border-primary resize-none" />
               </div>
-
               <div className="flex gap-3">
                 {saved ? (
                   <div className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-green-50 text-green-700 font-bold text-sm">
@@ -358,6 +498,7 @@ const PsychologistDashboard = ({ user }: { user: any }) => {
 const Dashboard = () => {
   const { user } = useAuthStore();
   if (!user) return null;
+  if (user.role === 'ADMIN')        return <AdminDashboard user={user} />;
   if (user.role === 'PSYCHOLOGIST') return <PsychologistDashboard user={user} />;
   return <StudentDashboard user={user} />;
 };
