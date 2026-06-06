@@ -92,6 +92,24 @@ Variables relacionadas:
 - Backend: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DIRECT_URL`.
 - Frontend: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
 
+## Reglas de Correos Transaccionales
+
+El envio de correos usa Resend desde el backend.
+
+Mantener estas reglas al modificar correos:
+
+1. Usar `backend/src/lib/email.ts` como punto unico de envio.
+2. Centralizar HTML reutilizable en `backend/src/lib/emailTemplates.ts`.
+3. No exponer `RESEND_API_KEY` ni `EMAIL_FROM` en frontend.
+4. No versionar llaves reales, remitentes privados no aprobados ni archivos `.env`.
+5. En desarrollo, usar `RESEND_DEV_EMAIL` para redirigir correos de prueba cuando sea necesario.
+6. Los eventos de cita deben mantener consistencia entre notificacion interna, correo y WhatsApp cuando aplique.
+7. Los recordatorios programados deben evitar duplicados y documentar su ventana horaria.
+
+Variables relacionadas:
+
+- Backend: `RESEND_API_KEY`, `EMAIL_FROM`, `RESEND_DEV_EMAIL`, `NODE_ENV`.
+
 ## Despues de Programar
 
 Entregar:

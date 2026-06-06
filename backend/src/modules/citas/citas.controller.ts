@@ -6,6 +6,19 @@ import {
   sendCancellationToStudent,
   sendCancellationToProfessional,
 } from '../../lib/twilio';
+import { sendEmail } from '../../lib/email';
+import {
+  citaAgendadaTemplate,
+  citaCanceladaTemplate,
+  citaReagendadaTemplate,
+} from '../../lib/emailTemplates';
+
+// ── Helpers de formato ─────────────────────────────────────────────────────────
+const formatFecha = (date: Date) =>
+  date.toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Bogota' });
+
+const formatHora = (date: Date) =>
+  date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Bogota' });
 
 // ── GET /api/citas ─────────────────────────────────────────────────────────────
 export const getCitas = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -67,7 +80,6 @@ export const createCita = async (req: AuthRequest, res: Response): Promise<void>
   const user = req.user!;
   const { professionalId, date, type, mode, notes, studentPhone } = req.body;
 
-  // Validar teléfono (obligatorio, +57 + 10 dígitos)
   const cleanPhone = (studentPhone ?? '').replace(/\s/g, '');
   if (!cleanPhone || !/^\+57\d{10}$/.test(cleanPhone)) {
     res.status(400).json({ error: 'Número de teléfono inválido. Debe tener formato +57XXXXXXXXXX' });
@@ -81,24 +93,18 @@ export const createCita = async (req: AuthRequest, res: Response): Promise<void>
   }
 
   const citaDate = new Date(date);
-
-  // Convertir a hora de Colombia (UTC-5) para comparar con los slots de disponibilidad
-  // que están definidos en hora local
-  const colombiaOffset = -5 * 60; // minutos
+  const colombiaOffset = -5 * 60;
   const localMinutes = citaDate.getUTCHours() * 60 + citaDate.getUTCMinutes() + colombiaOffset;
   const adjustedMinutes = ((localMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
-
-  // El día de la semana también debe calcularse en hora Colombia
   const utcDay = citaDate.getUTCDay();
   const totalUTCMinutes = citaDate.getUTCHours() * 60 + citaDate.getUTCMinutes();
-  const dayOfWeek = totalUTCMinutes + colombiaOffset < 0 
-    ? ((utcDay - 1) + 7) % 7 
-    : totalUTCMinutes + colombiaOffset >= 24 * 60 
-      ? (utcDay + 1) % 7 
+  const dayOfWeek = totalUTCMinutes + colombiaOffset < 0
+    ? ((utcDay - 1) + 7) % 7
+    : totalUTCMinutes + colombiaOffset >= 24 * 60
+      ? (utcDay + 1) % 7
       : utcDay;
   const slotMinutes = adjustedMinutes;
 
-  // Verificar que el horario esté dentro de un bloque disponible
   const matchingSlot = await (prisma as any).availableSlot.findFirst({
     where: {
       professionalId,
@@ -117,7 +123,6 @@ export const createCita = async (req: AuthRequest, res: Response): Promise<void>
   const durationMin = matchingSlot.durationMin ?? 50;
   const slotEnd = new Date(citaDate.getTime() + durationMin * 60 * 1000);
 
-  // Verificar que ese slot no esté ocupado
   const overlap = await prisma.cita.findFirst({
     where: {
       professionalId,
@@ -140,7 +145,6 @@ export const createCita = async (req: AuthRequest, res: Response): Promise<void>
       mode: mode ?? 'Presencial',
       notes,
       studentPhone: cleanPhone,
-      // location NO se asigna al crear; la asigna el psicólogo después
     },
     include: {
       professional: { select: { id: true, name: true, email: true } },
@@ -152,11 +156,36 @@ export const createCita = async (req: AuthRequest, res: Response): Promise<void>
     data: {
       userId:  user.id,
       title:   'Cita Agendada',
-      message: `Tu cita con ${professional.name} ha sido agendada para el ${citaDate.toLocaleDateString('es-CO', { dateStyle: 'full' })}.`,
+      message: `Tu cita con ${professional.name} ha sido agendada para el ${formatFecha(citaDate)}.`,
       type:    'SUCCESS',
     },
   });
 
+  // ── Correos al agendar ──────────────────────────────────────────────────────
+  const emailData = {
+    nombreEstudiante: cita.student.name ?? 'Estudiante',
+    nombrePsicologo:  professional.name ?? 'Psicólogo/a',
+    fecha:            formatFecha(citaDate),
+    hora:             formatHora(citaDate),
+    tipo:             type ?? 'Consulta General',
+    modo:             mode ?? 'Presencial',
+  };
+
+  // Al estudiante
+  sendEmail({
+    to:      cita.student.email,
+    subject: '✅ Cita agendada — Equilibria',
+    html:    citaAgendadaTemplate({ ...emailData, esEstudiante: true }),
+  }).catch(() => {});
+
+  // Al psicólogo
+  sendEmail({
+    to:      professional.email,
+    subject: '📅 Nueva cita agendada — Equilibria',
+    html:    citaAgendadaTemplate({ ...emailData, esEstudiante: false }),
+  }).catch(() => {});
+
+  // WhatsApp (existente)
   sendAppointmentConfirmation({
     to:               cleanPhone,
     studentName:      cita.student.name ?? 'Estudiante',
@@ -175,7 +204,13 @@ export const updateCita = async (req: AuthRequest, res: Response): Promise<void>
   const id   = parseInt(req.params.id);
   const data = req.body;
 
-  const cita = await prisma.cita.findUnique({ where: { id } });
+  const cita = await prisma.cita.findUnique({
+    where: { id },
+    include: {
+      student:      { select: { id: true, name: true, email: true } },
+      professional: { select: { id: true, name: true, email: true } },
+    },
+  });
   if (!cita) { res.status(404).json({ error: 'Cita no encontrada' }); return; }
 
   const canEdit =
@@ -185,6 +220,9 @@ export const updateCita = async (req: AuthRequest, res: Response): Promise<void>
 
   if (!canEdit) { res.status(403).json({ error: 'Sin permisos para modificar esta cita' }); return; }
 
+  // Guardar fecha anterior antes de actualizar (para reagendado)
+  const fechaAnterior = cita.date;
+
   const updated = await prisma.cita.update({
     where: { id },
     data: {
@@ -192,65 +230,112 @@ export const updateCita = async (req: AuthRequest, res: Response): Promise<void>
       ...(data.date   && { date:   new Date(data.date) }),
       ...(data.type   && { type:   data.type }),
       ...(data.mode   && { mode:   data.mode }),
-      // Solo psicólogo/admin asigna location
       ...(data.location !== undefined && user.role !== 'USER' && { location: data.location }),
       ...(data.notes !== undefined && { notes: data.notes }),
       ...(data.psychNotes !== undefined && { psychNotes: data.psychNotes }),
     },
     include: {
-      professional: { select: { id: true, name: true } },
-      student:      { select: { id: true, name: true } },
+      professional: { select: { id: true, name: true, email: true } },
+      student:      { select: { id: true, name: true, email: true } },
     },
   });
 
-  if (data.status && cita.professionalId === user.id) {
-    const statusLabel: Record<string, string> = {
-      CONFIRMADA: 'confirmada ✅',
-      CANCELADA:  'cancelada ❌',
-      COMPLETADA: 'marcada como completada',
-    };
+  const nuevaFecha = data.date ? new Date(data.date) : null;
+  const fueReagendada = nuevaFecha && nuevaFecha.getTime() !== fechaAnterior.getTime();
+
+  // ── Cancelación por psicólogo ───────────────────────────────────────────────
+  if (data.status === 'CANCELADA' && cita.professionalId === user.id) {
     await prisma.notification.create({
       data: {
         userId:  cita.studentId,
-        title:   `Cita ${statusLabel[data.status] ?? 'actualizada'}`,
-        message: `Tu cita ha sido ${statusLabel[data.status] ?? 'actualizada'} por tu profesional.`,
-        type:    data.status === 'CONFIRMADA' ? 'SUCCESS' : data.status === 'CANCELADA' ? 'WARNING' : 'INFO',
+        title:   'Cita cancelada ❌',
+        message: `Tu cita con ${updated.professional.name} ha sido cancelada.`,
+        type:    'WARNING',
       },
     });
 
-    // WhatsApp al estudiante si el psicólogo cancela
-    if (data.status === 'CANCELADA') {
-      const student = await prisma.user.findUnique({ where: { id: cita.studentId } });
-      if (student && (student as any).phone) {
-        sendCancellationToStudent({
-          to:               (student as any).phone,
-          studentName:      student.name ?? 'Estudiante',
-          date:             cita.date,
-          professionalName: updated.professional.name ?? 'tu psicólogo/a',
-          cancelledBy:      'professional',
-        }).catch(() => {});
-      }
+    const emailData = {
+      nombreEstudiante: cita.student.name ?? 'Estudiante',
+      nombrePsicologo:  updated.professional.name ?? 'Psicólogo/a',
+      fecha:            formatFecha(fechaAnterior),
+      hora:             formatHora(fechaAnterior),
+    };
+
+    sendEmail({ to: cita.student.email, subject: '❌ Cita cancelada — Equilibria', html: citaCanceladaTemplate({ ...emailData, esEstudiante: true }) }).catch(() => {});
+    sendEmail({ to: updated.professional.email, subject: '❌ Cita cancelada — Equilibria', html: citaCanceladaTemplate({ ...emailData, esEstudiante: false }) }).catch(() => {});
+
+    const student = await prisma.user.findUnique({ where: { id: cita.studentId } });
+    if (student?.phone) {
+      sendCancellationToStudent({
+        to: student.phone, studentName: student.name ?? 'Estudiante',
+        date: fechaAnterior, professionalName: updated.professional.name ?? 'tu psicólogo/a',
+        cancelledBy: 'professional',
+      }).catch(() => {});
     }
   }
 
-  // WhatsApp al psicólogo si el estudiante cancela
+  // ── Cancelación por estudiante ──────────────────────────────────────────────
   if (data.status === 'CANCELADA' && user.role === 'USER') {
-    const professional = await prisma.user.findUnique({ where: { id: cita.professionalId } });
-    if (professional && (professional as any).phone) {
-      sendCancellationToProfessional({
-        to:               (professional as any).phone,
-        professionalName: professional.name ?? 'Psicólogo/a',
-        date:             cita.date,
-        studentName:      updated.student.name ?? 'un estudiante',
-      }).catch(() => {});
-    }
-    // Notificación interna al psicólogo
     await prisma.notification.create({
       data: {
         userId:  cita.professionalId,
         title:   'Cita cancelada por estudiante',
-        message: `El/la estudiante ${updated.student.name ?? ''} canceló su cita del ${cita.date.toLocaleDateString('es-CO')}.`,
+        message: `${cita.student.name ?? 'Un estudiante'} canceló su cita del ${formatFecha(fechaAnterior)}.`,
         type:    'WARNING',
+      },
+    });
+
+    const emailData = {
+      nombreEstudiante: cita.student.name ?? 'Estudiante',
+      nombrePsicologo:  updated.professional.name ?? 'Psicólogo/a',
+      fecha:            formatFecha(fechaAnterior),
+      hora:             formatHora(fechaAnterior),
+    };
+
+    sendEmail({ to: cita.student.email, subject: '❌ Cita cancelada — Equilibria', html: citaCanceladaTemplate({ ...emailData, esEstudiante: true }) }).catch(() => {});
+    sendEmail({ to: updated.professional.email, subject: '❌ Cita cancelada por estudiante — Equilibria', html: citaCanceladaTemplate({ ...emailData, esEstudiante: false }) }).catch(() => {});
+
+    const professional = await prisma.user.findUnique({ where: { id: cita.professionalId } });
+    if (professional?.phone) {
+      sendCancellationToProfessional({
+        to: professional.phone, professionalName: professional.name ?? 'Psicólogo/a',
+        date: fechaAnterior, studentName: cita.student.name ?? 'un estudiante',
+      }).catch(() => {});
+    }
+  }
+
+  // ── Reagendado ──────────────────────────────────────────────────────────────
+  if (fueReagendada) {
+    const emailData = {
+      nombreEstudiante: cita.student.name ?? 'Estudiante',
+      nombrePsicologo:  updated.professional.name ?? 'Psicólogo/a',
+      fechaAnterior:    formatFecha(fechaAnterior),
+      horaAnterior:     formatHora(fechaAnterior),
+      fechaNueva:       formatFecha(nuevaFecha!),
+      horaNueva:        formatHora(nuevaFecha!),
+    };
+
+    sendEmail({ to: cita.student.email, subject: '🔄 Cita reagendada — Equilibria', html: citaReagendadaTemplate({ ...emailData, esEstudiante: true }) }).catch(() => {});
+    sendEmail({ to: updated.professional.email, subject: '🔄 Cita reagendada — Equilibria', html: citaReagendadaTemplate({ ...emailData, esEstudiante: false }) }).catch(() => {});
+
+    await prisma.notification.create({
+      data: {
+        userId:  cita.studentId,
+        title:   'Cita reagendada 🔄',
+        message: `Tu cita fue reagendada al ${formatFecha(nuevaFecha!)}.`,
+        type:    'INFO',
+      },
+    });
+  }
+
+  // ── Confirmación por psicólogo ──────────────────────────────────────────────
+  if (data.status === 'CONFIRMADA' && cita.professionalId === user.id) {
+    await prisma.notification.create({
+      data: {
+        userId:  cita.studentId,
+        title:   'Cita confirmada ✅',
+        message: `Tu cita con ${updated.professional.name} fue confirmada.`,
+        type:    'SUCCESS',
       },
     });
   }
@@ -280,7 +365,7 @@ export const deleteCita = async (req: AuthRequest, res: Response): Promise<void>
   res.status(204).send();
 };
 
-// ── GET /api/citas/professionals ──────────────────────────────────────────────
+// ── GET /api/citas/professionals ───────────────────────────────────────────────
 export const getProfessionals = async (_req: AuthRequest, res: Response): Promise<void> => {
   const professionals = await prisma.user.findMany({
     where:   { role: 'PSYCHOLOGIST' },

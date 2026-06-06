@@ -1,10 +1,10 @@
 # PROJECT_CONTEXT - Equilibria
 
-Ultima actualizacion: 2026-06-05
+Ultima actualizacion: 2026-06-06
 
 ## Descripcion general
 
-Equilibria es una plataforma web para gestion de citas y bienestar psicologico universitario. Permite autenticacion de usuarios, gestion de citas, agenda, notificaciones, administracion de usuarios/reportes y recordatorios por WhatsApp.
+Equilibria es una plataforma web para gestion de citas y bienestar psicologico universitario. Permite autenticacion de usuarios, gestion de citas, agenda, notificaciones, administracion de usuarios/reportes y comunicaciones por correo y WhatsApp.
 
 ## Arquitectura utilizada
 
@@ -15,7 +15,7 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 - Runtime local: `tsx server.ts`, con Vite en modo middleware durante desarrollo.
 - Runtime produccion: build Vite estatico servido desde Express y bundle backend generado con esbuild.
 - Infraestructura: Docker/Docker Compose para PostgreSQL y aplicacion.
-- Integraciones: Supabase Auth para OAuth Google institucional, Twilio para recordatorios WhatsApp y node-cron para scheduler.
+- Integraciones: Supabase Auth para OAuth Google institucional, Resend para correos transaccionales, Twilio para avisos WhatsApp y node-cron para scheduler.
 
 ## Estructura completa de carpetas y archivos
 
@@ -33,6 +33,8 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 |   |   `-- cita.schema.ts
 |   |-- src/
 |   |   |-- lib/
+|   |   |   |-- email.ts
+|   |   |   |-- emailTemplates.ts
 |   |   |   |-- prisma.ts
 |   |   |   |-- supabase.ts
 |   |   |   `-- twilio.ts
@@ -114,14 +116,16 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 - `server.ts`: punto de entrada HTTP. En desarrollo monta Vite como middleware; en produccion sirve `dist/public`.
 - `backend/app.ts`: configura Express, CORS, JSON, health check, rutas `/api/*`, scheduler de recordatorios y manejador global de errores.
 - `backend/src/modules/auth`: sincronizacion de usuarios autenticados por Supabase y perfil autenticado.
-- `backend/src/modules/citas`: gestion de citas, profesionales, proxima cita, disponibilidad y slots.
-- `backend/src/modules/citas/reminders.ts`: scheduler de recordatorios de citas por WhatsApp.
+- `backend/src/modules/citas`: gestion de citas, profesionales, proxima cita, disponibilidad, slots y notificaciones transaccionales al agendar, cancelar o reagendar.
+- `backend/src/modules/citas/reminders.ts`: scheduler de recordatorios de citas por correo para citas en la ventana de 23 a 25 horas.
 - `backend/src/modules/users`: perfil del usuario autenticado y cambio de password.
 - `backend/src/modules/notifications`: listado, conteo y marcado de notificaciones.
 - `backend/src/modules/admin`: estadisticas, usuarios, citas globales y reportes administrativos. Requiere rol `ADMIN`.
 - `backend/src/middlewares`: autenticacion por token Supabase, control de roles y validacion con Zod.
 - `backend/src/lib/prisma.ts`: cliente Prisma compartido con conexion PostgreSQL directa.
 - `backend/src/lib/supabase.ts`: cliente Supabase de servidor para validar tokens de acceso.
+- `backend/src/lib/email.ts`: cliente Resend compartido para enviar correos transaccionales.
+- `backend/src/lib/emailTemplates.ts`: plantillas HTML para citas agendadas, canceladas y reagendadas.
 - `backend/src/lib/twilio.ts`: integracion Twilio.
 - `backend/prisma/schema.prisma`: modelo de datos Prisma.
 - `backend/prisma/seed.ts`: datos iniciales/demo.
@@ -147,6 +151,8 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 - `role.middleware.ts` restringe rutas administrativas.
 - `validate.middleware.ts` valida payloads con esquemas Zod.
 - `schema.prisma` define entidades usadas por controladores, seed y consultas Prisma.
+- `citas.controller.ts` envia notificaciones internas, correos Resend y avisos WhatsApp segun el evento de cita.
+- `reminders.ts` corre al iniciar y luego cada hora para enviar recordatorios por correo, evitando duplicados en memoria con un `Set`.
 
 ## Base de datos y entidades
 
@@ -196,6 +202,14 @@ Citas y slots, todos requieren auth:
 - `PATCH /citas/:id`: actualizar cita.
 - `DELETE /citas/:id`: eliminar cita.
 
+Eventos de comunicacion de citas:
+
+- Al crear una cita: notificacion interna al estudiante, correo al estudiante, correo al psicologo y confirmacion WhatsApp al estudiante.
+- Al cancelar una cita: correos para estudiante y psicologo; si cancela el psicologo tambien se envia WhatsApp al estudiante; si cancela el estudiante se envia WhatsApp al psicologo.
+- Al reagendar una cita: correos para estudiante y psicologo, mas notificacion interna al estudiante.
+- Al confirmar una cita por el psicologo: notificacion interna al estudiante.
+- Recordatorios: correos a estudiantes con citas `PENDIENTE` o `CONFIRMADA` entre 23 y 25 horas desde la ejecucion del scheduler.
+
 Usuarios, todos requieren auth:
 
 - `GET /users/me`: obtener perfil.
@@ -230,6 +244,7 @@ Admin, todos requieren auth y rol `ADMIN`:
 - `express`, `cors`: API HTTP.
 - `zod`: validacion de entradas.
 - `@supabase/supabase-js`: OAuth Google y validacion de tokens Supabase.
+- `resend`: envio de correos transaccionales.
 - `jsonwebtoken`, `bcryptjs`: dependencias historicas para autenticacion/password; revisar si siguen siendo necesarias despues de completar la migracion a Supabase.
 - `@prisma/client`, `prisma`, `@prisma/adapter-pg`, `pg`: ORM y PostgreSQL.
 - `twilio`: mensajes WhatsApp/SMS.
@@ -253,6 +268,9 @@ Admin, todos requieren auth y rol `ADMIN`:
 - `DATABASE_URL`: aun aparece en `backend/prisma/seed.ts`; revisar si debe migrarse a `DIRECT_URL` para consistencia.
 - `SUPABASE_URL`: URL del proyecto Supabase usada por el backend.
 - `SUPABASE_SERVICE_ROLE_KEY`: service role key del backend. No debe exponerse en frontend ni commits.
+- `RESEND_API_KEY`: API key de Resend usada por el backend para correos transaccionales.
+- `EMAIL_FROM`: remitente verificado en Resend para los correos salientes.
+- `RESEND_DEV_EMAIL`: destinatario opcional para redirigir correos en desarrollo.
 - `VITE_SUPABASE_URL`: URL del proyecto Supabase expuesta al cliente Vite.
 - `VITE_SUPABASE_ANON_KEY`: anon key de Supabase expuesta al cliente Vite.
 
@@ -262,6 +280,7 @@ Admin, todos requieren auth y rol `ADMIN`:
 - 2026-06-04: Se crea `.ai/rules.md` con reglas operativas de trabajo, Git, documentacion y entrega.
 - 2026-06-04: Se corrigen errores TypeScript antes de publicar la rama: relaciones Prisma en reportes admin, nombre de estudiante en confirmaciones de cita y configuracion Prisma.
 - 2026-06-05: Se migra el flujo de autenticacion a Supabase OAuth con Google institucional, se agrega callback frontend, sincronizacion `/auth/sync`, validacion de tokens Supabase en middleware y variables de entorno Supabase/DIRECT_URL.
+- 2026-06-06: Se agrega envio de correos transaccionales con Resend para citas agendadas, canceladas, reagendadas y recordatorios; se documentan plantillas HTML y variables de entorno de email, incluido destinatario de pruebas por entorno.
 
 ## Tareas pendientes
 
@@ -272,5 +291,7 @@ Admin, todos requieren auth y rol `ADMIN`:
 - Revisar codificacion de caracteres en documentos existentes si aparecen textos corruptos.
 - Revisar dependencias y esquemas de autenticacion legacy (`jsonwebtoken`, `bcryptjs`, `backend/schemas/auth.schema.ts`, `backend/utils/jwt.ts`) despues de completar la migracion a Supabase.
 - Alinear `backend/prisma/seed.ts` con `DIRECT_URL` o documentar por que conserva `DATABASE_URL`.
-- Documentar variables de entorno requeridas para Supabase, PostgreSQL y Twilio.
+- Verificar el remitente `EMAIL_FROM` en Resend antes de produccion.
+- Configurar `RESEND_DEV_EMAIL` en desarrollo si se desea redirigir correos de prueba.
+- Documentar variables de entorno requeridas para Supabase, PostgreSQL, Resend y Twilio.
 - Completar documentacion de reglas de negocio por rol y estado de cita.
