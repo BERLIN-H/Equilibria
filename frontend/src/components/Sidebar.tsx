@@ -32,8 +32,8 @@ const Sidebar = () => {
     { icon: Clock,       label: 'Agenda',           path: '/agenda',        roles: ['USER','PSYCHOLOGIST'] },
     { icon: User,        label: 'Usuario',          path: '/profile',       roles: ['USER','PSYCHOLOGIST','ADMIN'] },
     { icon: Bell,        label: 'Notificaciones',   path: '/notifications', roles: ['USER','PSYCHOLOGIST','ADMIN'] },
-    { icon: Settings,    label: 'Configuración',    path: '/settings',      roles: ['USER','PSYCHOLOGIST','ADMIN'] },
     { icon: ShieldCheck, label: 'Administración',   path: '/admin',         roles: ['ADMIN'] },
+    { icon: Settings,    label: 'Configuración',    path: '/settings',      roles: ['USER','PSYCHOLOGIST','ADMIN'] },
   ].filter(item => !user?.role || item.roles.includes(user.role));
 
   return (

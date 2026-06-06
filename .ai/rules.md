@@ -167,6 +167,22 @@ Variables relacionadas:
 
 - Backend: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_FROM`.
 
+## Cambios Recientes (2026-06-06)
+
+**Eliminaciones:**
+- `backend/schemas/auth.schema.ts`: Validaciones trasladadas a middlewares. Usar Zod directamente en controladores.
+- `backend/utils/jwt.ts`: JWT ahora delegado a Supabase Auth. Las rutas privadas validan con token Bearer.
+- `slots.sql`: Carga de horarios automatizada en seed de Prisma.
+
+**Adiciones:**
+- `.env.example`: Plantilla de variables de entorno. Copiar a `.env.local` en desarrollo.
+
+**Modificaciones:**
+- Docker: Mejorado para soportar full-stack containerizado con volúmenes persistentes.
+- Sidebar: Oculta "Pacientes" para roles que no sean PSYCHOLOGIST.
+- Dashboard: Refactor para mejor UX y responsividad.
+- .gitignore: Actualizado para excluir archivos sensibles.
+
 ## Despues de Programar
 
 Entregar:

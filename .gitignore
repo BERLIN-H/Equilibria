@@ -6,7 +6,6 @@ dist/
 
 # Entorno (NUNCA subir al repo)
 .env
-.env.example
 .env.local
 .env.*.local
 
