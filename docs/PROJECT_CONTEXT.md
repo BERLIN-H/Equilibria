@@ -117,6 +117,29 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 `-- vite.config.ts
 ```
 
+## Historial resumido de cambios
+
+**Actualizacion 2026-06-06:**
+- Removido `backend/schemas/auth.schema.ts`: validaciones trasladadas a middleware.
+- Removido `backend/utils/jwt.ts`: JWT delegado a Supabase Auth.
+- Removido `slots.sql`: carga de horarios automatizada.
+- Actualizado Docker para arquitectura full-stack containerizada.
+- Mejorado Sidebar para mostrar opciones segun roles (Pacientes solo para PSYCHOLOGIST).
+- Refactor Dashboard para mejor UX y legibilidad.
+- Agregado `.env.example` como plantilla de configuracion.
+- Normalizado docker-entrypoint.sh para manejo consistente de volúmenes y permisos.
+
+## Tareas pendientes
+
+- [ ] Pruebas E2E con Playwright para flujos autenticacion OAuth y citas.
+- [ ] Migracion a Prisma 8 cuando sea disponible.
+- [ ] Implementar Circuit Breaker para llamadas a servicios externos (Resend, Google Calendar, Twilio).
+- [ ] Agregar logging estructurado con pino.
+- [ ] Dashboard de administrador con graficos y estadisticas.
+- [ ] Soporte para reasignacion de psicologos en citas existentes.
+- [ ] Integracion de pagos para servicios premium.
+- [ ] API documentation con Swagger/OpenAPI.
+
 ## Funcion de cada modulo
 
 - `server.ts`: punto de entrada HTTP. En desarrollo monta Vite como middleware; en produccion sirve `dist/public`.
@@ -307,18 +330,13 @@ Admin, todos requieren auth y rol `ADMIN`:
 
 ## Tareas pendientes
 
-- [ ] Validar integracion Google Calendar con service account.
-- [ ] Completar implementacion de eventos WhatsApp (Twilio).
-- [ ] Agregar reportes de psicologos en admin module.
-- [ ] Implementar reporte de cancelaciones administrativas.
-- [ ] Agregar scheduler automatico de recordatorios de citas (citas.reminders.ts).
-- [ ] Revisar dependencias historicas (jsonwebtoken, bcryptjs) tras completar migracion a Supabase.
-- [ ] Validar flujo de seed.ts con nuevos modelos.
-- [ ] Documentar manual de deployment a produccion (Docker, CI/CD, secrets).
-- [ ] Crear tests unitarios e integracion para auth, citas y patients.
-- 2026-06-04: Se corrigen errores TypeScript antes de publicar la rama: relaciones Prisma en reportes admin, nombre de estudiante en confirmaciones de cita y configuracion Prisma.
-- 2026-06-05: Se migra el flujo de autenticacion a Supabase OAuth con Google institucional, se agrega callback frontend, sincronizacion `/auth/sync`, validacion de tokens Supabase en middleware y variables de entorno Supabase/DIRECT_URL.
-- 2026-06-06: Se agrega envio de correos transaccionales con Resend para citas agendadas, canceladas, reagendadas y recordatorios; se documentan plantillas HTML y variables de entorno de email, incluido destinatario de pruebas por entorno.
+- [ ] Verificar dominio en Resend para producción (`uniguajira.edu.co`)
+- [ ] Quitar `@gmail.com` del middleware cuando haya cuentas institucionales reales
+- [ ] Revisar y eliminar dependencias legacy: `jsonwebtoken`, `bcryptjs`, `jwt.ts`, `auth.schema.ts`
+- [ ] Crear migraciones Prisma versionadas si el esquema cambia
+- [ ] Documentar manual de deployment a producción (Docker, CI/CD, secrets)
+- [ ] Agregar pruebas automatizadas para endpoints críticos
+- [ ] Alinear `seed.ts` con `DIRECT_URL`
 
 ## Tareas pendientes
 
