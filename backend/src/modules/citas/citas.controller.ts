@@ -12,8 +12,12 @@ import {
   citaCanceladaTemplate,
   citaReagendadaTemplate,
 } from '../../lib/emailTemplates';
+import {
+  crearEventoCalendar,
+  eliminarEventoCalendar,
+  actualizarEventoCalendar,
+} from '../../lib/googleCalendar';
 
-// ── Helpers de formato ─────────────────────────────────────────────────────────
 const formatFecha = (date: Date) =>
   date.toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Bogota' });
 
@@ -161,7 +165,6 @@ export const createCita = async (req: AuthRequest, res: Response): Promise<void>
     },
   });
 
-  // ── Correos al agendar ──────────────────────────────────────────────────────
   const emailData = {
     nombreEstudiante: cita.student.name ?? 'Estudiante',
     nombrePsicologo:  professional.name ?? 'Psicólogo/a',
@@ -171,21 +174,9 @@ export const createCita = async (req: AuthRequest, res: Response): Promise<void>
     modo:             mode ?? 'Presencial',
   };
 
-  // Al estudiante
-  sendEmail({
-    to:      cita.student.email,
-    subject: '✅ Cita agendada — Equilibria',
-    html:    citaAgendadaTemplate({ ...emailData, esEstudiante: true }),
-  }).catch(() => {});
+  sendEmail({ to: cita.student.email, subject: '✅ Cita agendada — Equilibria', html: citaAgendadaTemplate({ ...emailData, esEstudiante: true }) }).catch(() => {});
+  sendEmail({ to: professional.email, subject: '📅 Nueva cita agendada — Equilibria', html: citaAgendadaTemplate({ ...emailData, esEstudiante: false }) }).catch(() => {});
 
-  // Al psicólogo
-  sendEmail({
-    to:      professional.email,
-    subject: '📅 Nueva cita agendada — Equilibria',
-    html:    citaAgendadaTemplate({ ...emailData, esEstudiante: false }),
-  }).catch(() => {});
-
-  // WhatsApp (existente)
   sendAppointmentConfirmation({
     to:               cleanPhone,
     studentName:      cita.student.name ?? 'Estudiante',
@@ -193,6 +184,21 @@ export const createCita = async (req: AuthRequest, res: Response): Promise<void>
     professionalName: professional.name ?? 'tu psicólogo/a',
     appointmentType:  type,
   }).catch(() => {});
+
+  // ── Google Calendar ────────────────────────────────────────────────────────
+  const fechaFin = new Date(citaDate.getTime() + durationMin * 60 * 1000);
+  const googleEventId = await crearEventoCalendar({
+    titulo:          `Cita Equilibria — ${type ?? 'Consulta General'}`,
+    descripcion:     `Sesión entre ${cita.student.name} y ${professional.name}.\nModalidad: ${mode ?? 'Presencial'}${notes ? `\nNotas: ${notes}` : ''}`,
+    fechaInicio:     citaDate,
+    fechaFin,
+    emailEstudiante: cita.student.email,
+    emailPsicologo:  professional.email,
+  });
+
+  if (googleEventId) {
+    await prisma.cita.update({ where: { id: cita.id }, data: { googleEventId } });
+  }
 
   const { location, studentPhone: sp, ...rest } = cita as any;
   res.status(201).json(rest);
@@ -220,7 +226,6 @@ export const updateCita = async (req: AuthRequest, res: Response): Promise<void>
 
   if (!canEdit) { res.status(403).json({ error: 'Sin permisos para modificar esta cita' }); return; }
 
-  // Guardar fecha anterior antes de actualizar (para reagendado)
   const fechaAnterior = cita.date;
 
   const updated = await prisma.cita.update({
@@ -272,6 +277,9 @@ export const updateCita = async (req: AuthRequest, res: Response): Promise<void>
         cancelledBy: 'professional',
       }).catch(() => {});
     }
+
+    // Google Calendar
+    if (cita.googleEventId) await eliminarEventoCalendar(cita.googleEventId);
   }
 
   // ── Cancelación por estudiante ──────────────────────────────────────────────
@@ -302,6 +310,9 @@ export const updateCita = async (req: AuthRequest, res: Response): Promise<void>
         date: fechaAnterior, studentName: cita.student.name ?? 'un estudiante',
       }).catch(() => {});
     }
+
+    // Google Calendar
+    if (cita.googleEventId) await eliminarEventoCalendar(cita.googleEventId);
   }
 
   // ── Reagendado ──────────────────────────────────────────────────────────────
@@ -326,6 +337,15 @@ export const updateCita = async (req: AuthRequest, res: Response): Promise<void>
         type:    'INFO',
       },
     });
+
+    // Google Calendar
+    if (cita.googleEventId) {
+      await actualizarEventoCalendar({
+        eventId:     cita.googleEventId,
+        fechaInicio: nuevaFecha!,
+        fechaFin:    new Date(nuevaFecha!.getTime() + 50 * 60 * 1000),
+      });
+    }
   }
 
   // ── Confirmación por psicólogo ──────────────────────────────────────────────

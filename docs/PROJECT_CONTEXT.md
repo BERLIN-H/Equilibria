@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT - Equilibria
 
-Ultima actualizacion: 2026-06-06
+Ultima actualizacion: 2026-06-05
 
 ## Descripcion general
 
@@ -15,7 +15,7 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 - Runtime local: `tsx server.ts`, con Vite en modo middleware durante desarrollo.
 - Runtime produccion: build Vite estatico servido desde Express y bundle backend generado con esbuild.
 - Infraestructura: Docker/Docker Compose para PostgreSQL y aplicacion.
-- Integraciones: Supabase Auth para OAuth Google institucional, Resend para correos transaccionales, Twilio para avisos WhatsApp y node-cron para scheduler.
+- Integraciones: Supabase Auth para OAuth Google institucional, Resend para correos transaccionales, Google Calendar para eventos de citas, Twilio para avisos WhatsApp y node-cron para scheduler.
 
 ## Estructura completa de carpetas y archivos
 
@@ -35,6 +35,7 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 |   |   |-- lib/
 |   |   |   |-- email.ts
 |   |   |   |-- emailTemplates.ts
+|   |   |   |-- googleCalendar.ts
 |   |   |   |-- prisma.ts
 |   |   |   |-- supabase.ts
 |   |   |   `-- twilio.ts
@@ -57,6 +58,9 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 |   |       |-- notifications/
 |   |       |   |-- notifications.controller.ts
 |   |       |   `-- notifications.routes.ts
+|   |       |-- patients/
+|   |       |   |-- patients.controller.ts
+|   |       |   `-- patients.routes.ts
 |   |       `-- users/
 |   |           |-- users.controller.ts
 |   |           `-- users.routes.ts
@@ -71,6 +75,7 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 |       |   |-- axios.ts
 |       |   |-- citas.ts
 |       |   |-- notifications.ts
+|       |   |-- patients.ts
 |       |   `-- users.ts
 |       |-- components/
 |       |   |-- ConfirmModal.tsx
@@ -87,6 +92,7 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 |       |   |-- Login.tsx
 |       |   |-- AuthCallback.tsx
 |       |   |-- Notifications.tsx
+|       |   |-- Patients.tsx
 |       |   |-- Profile.tsx
 |       |   |-- Settings.tsx
 |       |   `-- UrgentHelp.tsx
@@ -116,8 +122,9 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 - `server.ts`: punto de entrada HTTP. En desarrollo monta Vite como middleware; en produccion sirve `dist/public`.
 - `backend/app.ts`: configura Express, CORS, JSON, health check, rutas `/api/*`, scheduler de recordatorios y manejador global de errores.
 - `backend/src/modules/auth`: sincronizacion de usuarios autenticados por Supabase y perfil autenticado.
-- `backend/src/modules/citas`: gestion de citas, profesionales, proxima cita, disponibilidad, slots y notificaciones transaccionales al agendar, cancelar o reagendar.
+- `backend/src/modules/citas`: gestion de citas, profesionales, proxima cita, disponibilidad, slots, notificaciones transaccionales y sincronizacion con Google Calendar al agendar, cancelar o reagendar.
 - `backend/src/modules/citas/reminders.ts`: scheduler de recordatorios de citas por correo para citas en la ventana de 23 a 25 horas.
+- `backend/src/modules/patients`: listado e historial de pacientes atendidos por un psicologo. Requiere rol `PSYCHOLOGIST`.
 - `backend/src/modules/users`: perfil del usuario autenticado y cambio de password.
 - `backend/src/modules/notifications`: listado, conteo y marcado de notificaciones.
 - `backend/src/modules/admin`: estadisticas, usuarios, citas globales y reportes administrativos. Requiere rol `ADMIN`.
@@ -126,22 +133,25 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 - `backend/src/lib/supabase.ts`: cliente Supabase de servidor para validar tokens de acceso.
 - `backend/src/lib/email.ts`: cliente Resend compartido para enviar correos transaccionales.
 - `backend/src/lib/emailTemplates.ts`: plantillas HTML para citas agendadas, canceladas y reagendadas.
+- `backend/src/lib/googleCalendar.ts`: cliente Google Calendar con service account para crear, actualizar y eliminar eventos de citas.
 - `backend/src/lib/twilio.ts`: integracion Twilio.
 - `backend/prisma/schema.prisma`: modelo de datos Prisma.
 - `backend/prisma/seed.ts`: datos iniciales/demo.
 - `backend/schemas`: esquemas Zod para auth, citas y perfil.
 - `frontend/src/api`: clientes Axios por dominio que consumen `/api`.
+- `frontend/src/api/patients.ts`: cliente para pacientes y actualizacion de notas clinicas.
 - `frontend/src/lib/supabase.ts`: cliente Supabase de navegador para iniciar OAuth con Google.
 - `frontend/src/store/authStore.ts`: estado de autenticacion persistido con token Supabase.
 - `frontend/src/App.tsx`: rutas publicas y protegidas de React Router.
 - `frontend/src/layouts/MainLayout.tsx`: layout principal autenticado.
 - `frontend/src/components`: UI compartida, navegacion, barra superior, rutas protegidas y modal de confirmacion.
 - `frontend/src/pages`: pantallas funcionales de la aplicacion.
+- `frontend/src/pages/Patients.tsx`: vista de pacientes para psicologos, con busqueda, ficha del estudiante, historial y edicion de notas clinicas.
 
 ## Relacion entre archivos
 
 - `frontend/src/main.tsx` renderiza `App.tsx`.
-- `App.tsx` define `/` como login, `/auth/callback` como retorno OAuth y protege `/dashboard`, `/appointments`, `/agenda`, `/profile`, `/notifications`, `/settings`, `/urgent-help` y `/admin` con `ProtectedRoute`.
+- `App.tsx` define `/` como login, `/auth/callback` como retorno OAuth y protege `/dashboard`, `/appointments`, `/agenda`, `/patients`, `/profile`, `/notifications`, `/settings`, `/urgent-help` y `/admin` con `ProtectedRoute`.
 - `Login.tsx` inicia OAuth Google con Supabase y redirige a `/auth/callback`.
 - `AuthCallback.tsx` procesa la sesion Supabase, llama `/api/auth/sync`, guarda usuario/token en `authStore` y redirige al dashboard.
 - Los clientes en `frontend/src/api/*.ts` usan `frontend/src/api/axios.ts`, que agrega automaticamente el token persistido desde `localStorage`.
@@ -152,7 +162,10 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 - `validate.middleware.ts` valida payloads con esquemas Zod.
 - `schema.prisma` define entidades usadas por controladores, seed y consultas Prisma.
 - `citas.controller.ts` envia notificaciones internas, correos Resend y avisos WhatsApp segun el evento de cita.
+- `citas.controller.ts` guarda `googleEventId` cuando crea un evento en Google Calendar, elimina el evento si la cita se cancela y lo actualiza si se reagenda.
 - `reminders.ts` corre al iniciar y luego cada hora para enviar recordatorios por correo, evitando duplicados en memoria con un `Set`.
+- `patients.routes.ts` expone `/api/patients` protegido por `authMiddleware`; el controlador valida que el usuario sea `PSYCHOLOGIST`.
+- `Sidebar.tsx` muestra la opcion `Pacientes` solo para usuarios con rol `PSYCHOLOGIST`.
 
 ## Base de datos y entidades
 
@@ -161,7 +174,7 @@ Base de datos PostgreSQL administrada con Prisma.
 Entidades:
 
 - `User` (`users`): usuarios del sistema. Campos principales: `email`, `name`, `password`, `role`, `phone`, `address`, `faculty`, `semester`.
-- `Cita` (`citas`): cita entre estudiante y profesional. Campos: `studentId`, `professionalId`, `date`, `type`, `mode`, `location`, `status`, `notes`, `psychNotes`, `studentPhone`.
+- `Cita` (`citas`): cita entre estudiante y profesional. Campos: `studentId`, `professionalId`, `date`, `type`, `mode`, `location`, `status`, `notes`, `psychNotes`, `studentPhone`, `googleEventId`.
 - `AvailableSlot` (`available_slots`): disponibilidad de profesionales por dia, rango horario y duracion.
 - `Notification` (`notifications`): mensajes para usuarios, con tipo, estado de lectura y fecha.
 
@@ -202,11 +215,17 @@ Citas y slots, todos requieren auth:
 - `PATCH /citas/:id`: actualizar cita.
 - `DELETE /citas/:id`: eliminar cita.
 
+Pacientes, todos requieren auth y rol `PSYCHOLOGIST`:
+
+- `GET /patients`: listar estudiantes atendidos por el psicologo autenticado, deduplicados por estudiante, con total de sesiones, ultima cita y estado.
+- `GET /patients/:id`: obtener ficha del estudiante e historial de citas con ese psicologo.
+
 Eventos de comunicacion de citas:
 
 - Al crear una cita: notificacion interna al estudiante, correo al estudiante, correo al psicologo y confirmacion WhatsApp al estudiante.
-- Al cancelar una cita: correos para estudiante y psicologo; si cancela el psicologo tambien se envia WhatsApp al estudiante; si cancela el estudiante se envia WhatsApp al psicologo.
-- Al reagendar una cita: correos para estudiante y psicologo, mas notificacion interna al estudiante.
+- Al crear una cita: tambien se crea un evento en Google Calendar y se guarda su `googleEventId`.
+- Al cancelar una cita: correos para estudiante y psicologo; si cancela el psicologo tambien se envia WhatsApp al estudiante; si cancela el estudiante se envia WhatsApp al psicologo; si existe `googleEventId`, se elimina el evento.
+- Al reagendar una cita: correos para estudiante y psicologo, mas notificacion interna al estudiante; si existe `googleEventId`, se actualiza el evento.
 - Al confirmar una cita por el psicologo: notificacion interna al estudiante.
 - Recordatorios: correos a estudiantes con citas `PENDIENTE` o `CONFIRMADA` entre 23 y 25 horas desde la ejecucion del scheduler.
 
@@ -245,6 +264,7 @@ Admin, todos requieren auth y rol `ADMIN`:
 - `zod`: validacion de entradas.
 - `@supabase/supabase-js`: OAuth Google y validacion de tokens Supabase.
 - `resend`: envio de correos transaccionales.
+- `googleapis`: integracion con Google Calendar.
 - `jsonwebtoken`, `bcryptjs`: dependencias historicas para autenticacion/password; revisar si siguen siendo necesarias despues de completar la migracion a Supabase.
 - `@prisma/client`, `prisma`, `@prisma/adapter-pg`, `pg`: ORM y PostgreSQL.
 - `twilio`: mensajes WhatsApp/SMS.
@@ -278,6 +298,24 @@ Admin, todos requieren auth y rol `ADMIN`:
 
 - 2026-06-04: Se crea este documento de contexto del proyecto.
 - 2026-06-04: Se crea `.ai/rules.md` con reglas operativas de trabajo, Git, documentacion y entrega.
+- 2026-06-04: `feat: initial project structure` - Estructura inicial con modules de auth, citas, users, notifications.
+- 2026-06-04: `feat: migrar autenticacion a supabase` - OAuth Google institucional con Supabase Auth; validacion de tokens Supabase en backend.
+- 2026-06-04: `feat: agregar correos transaccionales` - Integracion con Resend; plantillas HTML para eventos de citas.
+- 2026-06-05: Se agrega integracion Google Calendar: crear, actualizar y eliminar eventos al agendar/cancelar/reagendar citas.
+- 2026-06-05: Se agrega modulo `patients`: listado de estudiantes atendidos por psicologos, ficha con historial, edicion de notas clinicas.
+- 2026-06-05: Se agrega cliente Twilio para notificaciones WhatsApp en eventos de citas.
+
+## Tareas pendientes
+
+- [ ] Validar integracion Google Calendar con service account.
+- [ ] Completar implementacion de eventos WhatsApp (Twilio).
+- [ ] Agregar reportes de psicologos en admin module.
+- [ ] Implementar reporte de cancelaciones administrativas.
+- [ ] Agregar scheduler automatico de recordatorios de citas (citas.reminders.ts).
+- [ ] Revisar dependencias historicas (jsonwebtoken, bcryptjs) tras completar migracion a Supabase.
+- [ ] Validar flujo de seed.ts con nuevos modelos.
+- [ ] Documentar manual de deployment a produccion (Docker, CI/CD, secrets).
+- [ ] Crear tests unitarios e integracion para auth, citas y patients.
 - 2026-06-04: Se corrigen errores TypeScript antes de publicar la rama: relaciones Prisma en reportes admin, nombre de estudiante en confirmaciones de cita y configuracion Prisma.
 - 2026-06-05: Se migra el flujo de autenticacion a Supabase OAuth con Google institucional, se agrega callback frontend, sincronizacion `/auth/sync`, validacion de tokens Supabase en middleware y variables de entorno Supabase/DIRECT_URL.
 - 2026-06-06: Se agrega envio de correos transaccionales con Resend para citas agendadas, canceladas, reagendadas y recordatorios; se documentan plantillas HTML y variables de entorno de email, incluido destinatario de pruebas por entorno.

@@ -12,6 +12,7 @@ import Settings from './pages/Settings';
 import UrgentHelp from './pages/UrgentHelp';
 import Admin from './pages/Admin';
 import AuthCallback from './pages/AuthCallback';
+import Patients from './pages/Patients';
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
             <Route path="/settings" element={<Settings />} />
             <Route path="/urgent-help" element={<UrgentHelp />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/patients" element={<Patients />} />
           </Route>
         </Route>
 

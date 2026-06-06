@@ -3,7 +3,6 @@ import { Plus, Calendar, Clock, X, Check, Trash2, Phone } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { citasApi, Cita, Professional } from '../api/citas';
 import { useAuthStore } from '../store/authStore';
-import ConfirmModal from '../components/ConfirmModal';
 
 interface TimeSlot { time: string; available: boolean; }
 
@@ -21,11 +20,9 @@ const TIPOS = [
   'Orientación vocacional', 'Crisis emocional',
 ];
 
-// ── Slots helpers ─────────────────────────────────────────────────────────────
 const buildSlotsFromApi = (rawSlots: string[]): TimeSlot[] =>
   rawSlots.map(t => ({ time: t, available: true }));
 
-// Fallback local (si el backend aún no tiene slots configurados para ese día)
 const getFallbackSlots = (date: string): TimeSlot[] => {
   const day = new Date(date).getDay();
   if (day === 0 || day === 6) return [];
@@ -42,23 +39,28 @@ const formatPhone = (value: string): string => {
 const validatePhone = (phone: string): boolean =>
   /^\+57\s?\d{10}$/.test(phone.replace(/\s/g, '').replace('+57', '+57 '));
 
-// ─────────────────────────────────────────────────────────────────────────────
 const Appointments: React.FC = () => {
   const { user } = useAuthStore();
-  const [citas, setCitas]           = useState<Cita[]>([]);
-  const [professionals, setProfessionals] = useState<Professional[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [showForm, setShowForm]     = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError]           = useState('');
-  const [filter, setFilter]         = useState('all');
-  const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
-  const [loadingSlots, setLoadingSlots]     = useState(false);
+  const [citas, setCitas]                     = useState<Cita[]>([]);
+  const [professionals, setProfessionals]     = useState<Professional[]>([]);
+  const [loading, setLoading]                 = useState(true);
+  const [showForm, setShowForm]               = useState(false);
+  const [submitting, setSubmitting]           = useState(false);
+  const [error, setError]                     = useState('');
+  const [filter, setFilter]                   = useState('all');
+  const [availableSlots, setAvailableSlots]   = useState<TimeSlot[]>([]);
+  const [loadingSlots, setLoadingSlots]       = useState(false);
 
-  // Cancel confirmation
-  const [cancelModalOpen, setCancelModalOpen] = useState(false);
-  const [citaToCancel, setCitaToCancel]       = useState<number | null>(null);
-  const [cancelling, setCancelling]           = useState(false);
+  // Cancel / reschedule
+  const [cancelModalOpen, setCancelModalOpen]     = useState(false);
+  const [citaToCancel, setCitaToCancel]           = useState<Cita | null>(null);
+  const [cancelling, setCancelling]               = useState(false);
+  const [showReschedule, setShowReschedule]       = useState(false);
+  const [rescheduleDate, setRescheduleDate]       = useState('');
+  const [rescheduleTime, setRescheduleTime]       = useState('');
+  const [rescheduleSlots, setRescheduleSlots]     = useState<TimeSlot[]>([]);
+  const [loadingReschedule, setLoadingReschedule] = useState(false);
+  const [rescheduling, setRescheduling]           = useState(false);
 
   const [form, setForm] = useState({
     professionalId: '',
@@ -70,7 +72,6 @@ const Appointments: React.FC = () => {
     phone: '+57 ',
   });
 
-  // ── Load data ───────────────────────────────────────────────────────────────
   const load = async () => {
     setLoading(true);
     const [c, p] = await Promise.all([citasApi.getAll(), citasApi.getProfessionals()]);
@@ -81,10 +82,8 @@ const Appointments: React.FC = () => {
 
   useEffect(() => { load(); }, []);
 
-  // ── Load available slots when prof + date change ────────────────────────────
   useEffect(() => {
     if (!form.professionalId || !form.date) { setAvailableSlots([]); return; }
-
     setLoadingSlots(true);
     citasApi.getAvailableSlots(parseInt(form.professionalId), form.date)
       .then(raw => {
@@ -93,14 +92,11 @@ const Appointments: React.FC = () => {
         if (form.time && !slots.find(s => s.time === form.time && s.available))
           setForm(f => ({ ...f, time: '' }));
       })
-      .catch(() => {
-        setAvailableSlots(getFallbackSlots(form.date));
-      })
+      .catch(() => setAvailableSlots(getFallbackSlots(form.date)))
       .finally(() => setLoadingSlots(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.professionalId, form.date]);
 
-  // ── Submit new appointment ──────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!form.professionalId || !form.date || !form.time) {
       setError('Profesional, fecha y hora son obligatorios'); return;
@@ -127,16 +123,51 @@ const Appointments: React.FC = () => {
     } finally { setSubmitting(false); }
   };
 
-  // ── Cancel with modal ───────────────────────────────────────────────────────
-  const handleCancelClick = (id: number) => { setCitaToCancel(id); setCancelModalOpen(true); };
+  const handleCancelClick = (cita: Cita) => {
+    setCitaToCancel(cita);
+    setShowReschedule(false);
+    setRescheduleDate('');
+    setRescheduleTime('');
+    setError('');
+    setCancelModalOpen(true);
+  };
+
   const handleCancelConfirm = async () => {
     if (!citaToCancel) return;
     setCancelling(true);
     try {
-      await citasApi.update(citaToCancel, { status: 'CANCELADA' });
-      setCancelModalOpen(false); setCitaToCancel(null);
+      await citasApi.update(citaToCancel.id, { status: 'CANCELADA' });
+      setCancelModalOpen(false);
+      setCitaToCancel(null);
       await load();
     } finally { setCancelling(false); }
+  };
+
+  const handleRescheduleLoad = async (date: string) => {
+    setRescheduleDate(date);
+    setRescheduleTime('');
+    if (!citaToCancel || !date) return;
+    setLoadingReschedule(true);
+    try {
+      const raw = await citasApi.getAvailableSlots(citaToCancel.professional.id, date);
+      setRescheduleSlots(raw.length > 0 ? buildSlotsFromApi(raw) : getFallbackSlots(date));
+    } catch {
+      setRescheduleSlots(getFallbackSlots(date));
+    } finally { setLoadingReschedule(false); }
+  };
+
+  const handleRescheduleConfirm = async () => {
+    if (!citaToCancel || !rescheduleDate || !rescheduleTime) return;
+    setRescheduling(true);
+    try {
+      const isoDate = new Date(`${rescheduleDate}T${rescheduleTime}:00`).toISOString();
+      await citasApi.update(citaToCancel.id, { date: isoDate });
+      setCancelModalOpen(false);
+      setCitaToCancel(null);
+      await load();
+    } catch (e: any) {
+      setError(e.response?.data?.error || 'Error al reagendar');
+    } finally { setRescheduling(false); }
   };
 
   const handleConfirm = async (id: number) => { await citasApi.update(id, { status: 'CONFIRMADA' }); await load(); };
@@ -209,13 +240,11 @@ const Appointments: React.FC = () => {
                     {user?.role === 'PSYCHOLOGIST' ? `Estudiante: ${c.student.name}` : `Profesional: ${c.professional.name}`}
                     {' · '}{c.mode}
                   </p>
-                  {/* Consultorio/link: solo visible para no-estudiantes */}
                   {!isStudent && c.location && (
                     <p className="text-sm text-on-surface-variant">
                       {c.mode === 'Virtual' ? '🔗 Link: ' : '📍 Consultorio: '}{c.location}
                     </p>
                   )}
-                  {/* Nota al estudiante sobre location */}
                   {isStudent && (
                     <p className="text-xs text-outline italic">
                       El lugar o enlace de reunión será informado por tu psicólogo/a.
@@ -231,8 +260,8 @@ const Appointments: React.FC = () => {
                     </button>
                   )}
                   {['PENDIENTE', 'CONFIRMADA'].includes(c.status) && (
-                    <button onClick={() => handleCancelClick(c.id)}
-                      className="p-2 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 transition-colors" title="Cancelar">
+                    <button onClick={() => handleCancelClick(c)}
+                      className="p-2 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 transition-colors" title="Cancelar / Reagendar">
                       <X size={18} />
                     </button>
                   )}
@@ -264,7 +293,6 @@ const Appointments: React.FC = () => {
               {error && <p className="text-sm text-error font-bold bg-error/10 px-4 py-2 rounded-lg">{error}</p>}
 
               <div className="space-y-3">
-                {/* Teléfono — obligatorio con prefijo +57 */}
                 <div>
                   <label className="text-sm font-bold text-on-surface-variant block mb-1">
                     <Phone size={14} className="inline mr-1" />
@@ -274,12 +302,9 @@ const Appointments: React.FC = () => {
                     onChange={e => setForm(f => ({ ...f, phone: formatPhone(e.target.value) }))}
                     placeholder="+57 3001234567"
                     className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none" />
-                  <p className="text-xs text-on-surface-variant mt-1">
-                    Recibirás confirmación de tu cita por WhatsApp
-                  </p>
+                  <p className="text-xs text-on-surface-variant mt-1">Recibirás confirmación de tu cita por WhatsApp</p>
                 </div>
 
-                {/* Profesional */}
                 <div>
                   <label className="text-sm font-bold text-on-surface-variant block mb-1">Profesional *</label>
                   <select value={form.professionalId}
@@ -290,7 +315,6 @@ const Appointments: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Fecha */}
                 <div>
                   <label className="text-sm font-bold text-on-surface-variant block mb-1">Fecha *</label>
                   <input type="date" value={form.date} min={new Date().toISOString().split('T')[0]}
@@ -298,7 +322,6 @@ const Appointments: React.FC = () => {
                     className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none" />
                 </div>
 
-                {/* Horarios disponibles */}
                 <div>
                   <label className="text-sm font-bold text-on-surface-variant block mb-1">Horario disponible *</label>
                   {!form.professionalId || !form.date ? (
@@ -332,7 +355,6 @@ const Appointments: React.FC = () => {
                   )}
                 </div>
 
-                {/* Tipo de consulta */}
                 <div>
                   <label className="text-sm font-bold text-on-surface-variant block mb-1">Tipo de consulta</label>
                   <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}
@@ -341,7 +363,6 @@ const Appointments: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Modalidad */}
                 <div>
                   <label className="text-sm font-bold text-on-surface-variant block mb-1">Modalidad</label>
                   <select value={form.mode} onChange={e => setForm(f => ({ ...f, mode: e.target.value as 'Presencial' | 'Virtual' }))}
@@ -351,7 +372,6 @@ const Appointments: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Notas */}
                 <div>
                   <label className="text-sm font-bold text-on-surface-variant block mb-1">Notas adicionales</label>
                   <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
@@ -375,18 +395,106 @@ const Appointments: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* ── Modal confirmación cancelar ──────────────────────────────────────── */}
-      <ConfirmModal
-        isOpen={cancelModalOpen}
-        onClose={() => { setCancelModalOpen(false); setCitaToCancel(null); }}
-        onConfirm={handleCancelConfirm}
-        title="Cancelar cita"
-        message="¿Estás seguro de cancelar esta cita? Esta acción no se puede deshacer."
-        confirmText="Confirmar cancelación"
-        cancelText="Volver"
-        variant="warning"
-        loading={cancelling}
-      />
+      {/* ── Modal cancelar / reagendar ───────────────────────────────────────── */}
+      <AnimatePresence>
+        {cancelModalOpen && citaToCancel && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-display font-bold text-lg text-on-surface">¿Qué deseas hacer?</h3>
+                  <p className="text-sm text-outline mt-1">
+                    {citaToCancel.type} · {new Date(citaToCancel.date).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </p>
+                </div>
+                <button onClick={() => setCancelModalOpen(false)} className="p-1 text-outline hover:text-on-surface">
+                  <X size={20} />
+                </button>
+              </div>
+
+              {!showReschedule ? (
+                <div className="space-y-3">
+                  <button onClick={() => setShowReschedule(true)}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-primary/20 hover:border-primary hover:bg-primary/5 transition-all text-left">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <Calendar size={20} className="text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-on-surface text-sm">Reagendar para otra fecha</p>
+                      <p className="text-xs text-outline mt-0.5">Cambia la fecha y hora de tu cita</p>
+                    </div>
+                  </button>
+
+                  <button onClick={handleCancelConfirm} disabled={cancelling}
+                    className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-red-100 hover:border-red-300 hover:bg-red-50 transition-all text-left disabled:opacity-60">
+                    <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+                      <X size={20} className="text-red-600" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-red-700 text-sm">{cancelling ? 'Cancelando...' : 'Cancelar la cita'}</p>
+                      <p className="text-xs text-red-400 mt-0.5">Esta acción no se puede deshacer</p>
+                    </div>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <button onClick={() => setShowReschedule(false)} className="text-sm text-primary font-bold hover:underline flex items-center gap-1">
+                    ← Volver
+                  </button>
+
+                  <div>
+                    <label className="text-sm font-bold text-on-surface-variant block mb-1">Nueva fecha *</label>
+                    <input type="date" value={rescheduleDate}
+                      min={new Date().toISOString().split('T')[0]}
+                      onChange={e => handleRescheduleLoad(e.target.value)}
+                      className="w-full bg-surface-container border-none rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary outline-none" />
+                  </div>
+
+                  {rescheduleDate && (
+                    <div>
+                      <label className="text-sm font-bold text-on-surface-variant block mb-1">Nuevo horario *</label>
+                      {loadingReschedule ? (
+                        <div className="flex items-center gap-2 px-4 py-3 bg-surface-container rounded-lg">
+                          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          <span className="text-sm text-on-surface-variant">Cargando horarios...</span>
+                        </div>
+                      ) : rescheduleSlots.length === 0 ? (
+                        <p className="text-sm text-yellow-700 bg-yellow-50 rounded-lg px-4 py-3">
+                          No hay horarios disponibles. Intenta con otro día.
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-4 gap-2">
+                          {rescheduleSlots.map(slot => (
+                            <button key={slot.time} type="button"
+                              onClick={() => setRescheduleTime(slot.time)}
+                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                                ${rescheduleTime === slot.time
+                                  ? 'bg-primary text-white'
+                                  : 'bg-surface-container hover:bg-surface-container-high text-on-surface'}`}>
+                              {slot.time}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {error && <p className="text-sm text-error font-bold bg-error/10 px-3 py-2 rounded-lg">{error}</p>}
+
+                  <button onClick={handleRescheduleConfirm}
+                    disabled={!rescheduleDate || !rescheduleTime || rescheduling}
+                    className="w-full py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary/90 disabled:opacity-60 transition-colors">
+                    {rescheduling ? 'Reagendando...' : 'Confirmar nueva fecha'}
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

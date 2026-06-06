@@ -4,6 +4,7 @@ import {
   Home,
   Calendar,
   User,
+  Users,
   Bell,
   Settings,
   LogOut,
@@ -27,6 +28,7 @@ const Sidebar = () => {
   const navItems = [
     { icon: Home,        label: 'Inicio',          path: '/dashboard',     roles: ['USER','PSYCHOLOGIST','ADMIN'] },
     { icon: Calendar,    label: 'Citas',            path: '/appointments',  roles: ['USER','PSYCHOLOGIST','ADMIN'] },
+    { icon: Users, label: 'Pacientes', path: '/patients', roles: ['PSYCHOLOGIST'] },
     { icon: Clock,       label: 'Agenda',           path: '/agenda',        roles: ['USER','PSYCHOLOGIST'] },
     { icon: User,        label: 'Usuario',          path: '/profile',       roles: ['USER','PSYCHOLOGIST','ADMIN'] },
     { icon: Bell,        label: 'Notificaciones',   path: '/notifications', roles: ['USER','PSYCHOLOGIST','ADMIN'] },
