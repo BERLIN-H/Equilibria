@@ -1,13 +1,10 @@
 import { Router } from 'express';
-import * as authController from './auth.controller';
+import { syncUser, me } from './auth.controller';
 import { authMiddleware } from '../../middlewares/auth.middleware';
-import { validate } from '../../middlewares/validate.middleware';
-import { loginSchema, registerSchema } from '../../../schemas/auth.schema';
 
 const router = Router();
 
-router.post('/login', validate(loginSchema), authController.login);
-router.post('/register', validate(registerSchema), authController.register);
-router.get('/me', authMiddleware, authController.me);
+router.post('/sync', syncUser);        // llamado tras login con Google
+router.get('/me', authMiddleware, me); // obtener usuario autenticado
 
 export default router;

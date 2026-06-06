@@ -11,13 +11,15 @@ import Notifications from './pages/Notifications';
 import Settings from './pages/Settings';
 import UrgentHelp from './pages/UrgentHelp';
 import Admin from './pages/Admin';
+import AuthCallback from './pages/AuthCallback';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Ruta pública */}
+        {/* Rutas públicas */}
         <Route path="/" element={<Login />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
 
         {/* Rutas protegidas */}
         <Route element={<ProtectedRoute />}>

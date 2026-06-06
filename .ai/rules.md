@@ -73,6 +73,25 @@ Siempre indicar:
 - Riesgos potenciales.
 - Impacto en otras partes del sistema.
 
+## Reglas de Autenticacion Actual
+
+El flujo vigente de autenticacion usa Supabase Auth con Google OAuth.
+
+Mantener estas reglas al modificar autenticacion:
+
+1. El frontend inicia sesion con `frontend/src/lib/supabase.ts` y redirige a `/auth/callback`.
+2. `frontend/src/pages/AuthCallback.tsx` debe sincronizar la sesion llamando `POST /api/auth/sync`.
+3. El backend valida tokens con `backend/src/lib/supabase.ts` y `supabase.auth.getUser`.
+4. Las rutas privadas deben usar el token Supabase en `Authorization: Bearer <token>`.
+5. `SUPABASE_SERVICE_ROLE_KEY` solo pertenece al backend; nunca usarla en frontend.
+6. Las credenciales OAuth y llaves reales no deben versionarse.
+7. El dominio institucional principal es `@uniguajira.edu.co`; cualquier dominio temporal de pruebas debe quedar documentado y revisarse antes de produccion.
+
+Variables relacionadas:
+
+- Backend: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DIRECT_URL`.
+- Frontend: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+
 ## Despues de Programar
 
 Entregar:
@@ -152,4 +171,3 @@ Despues de validar `dev`, crear Pull Request:
 - [ ] No se trabajo directamente sobre `main`.
 - [ ] Cambios revisados localmente.
 ```
-

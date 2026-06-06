@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT - Equilibria
 
-Ultima actualizacion: 2026-06-04
+Ultima actualizacion: 2026-06-05
 
 ## Descripcion general
 
@@ -15,7 +15,7 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 - Runtime local: `tsx server.ts`, con Vite en modo middleware durante desarrollo.
 - Runtime produccion: build Vite estatico servido desde Express y bundle backend generado con esbuild.
 - Infraestructura: Docker/Docker Compose para PostgreSQL y aplicacion.
-- Integraciones: Twilio para recordatorios WhatsApp y node-cron para scheduler.
+- Integraciones: Supabase Auth para OAuth Google institucional, Twilio para recordatorios WhatsApp y node-cron para scheduler.
 
 ## Estructura completa de carpetas y archivos
 
@@ -34,6 +34,7 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 |   |-- src/
 |   |   |-- lib/
 |   |   |   |-- prisma.ts
+|   |   |   |-- supabase.ts
 |   |   |   `-- twilio.ts
 |   |   |-- middlewares/
 |   |   |   |-- auth.middleware.ts
@@ -82,12 +83,15 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 |       |   |-- Appointments.tsx
 |       |   |-- Dashboard.tsx
 |       |   |-- Login.tsx
+|       |   |-- AuthCallback.tsx
 |       |   |-- Notifications.tsx
 |       |   |-- Profile.tsx
 |       |   |-- Settings.tsx
 |       |   `-- UrgentHelp.tsx
 |       |-- store/
 |       |   `-- authStore.ts
+|       |-- lib/
+|       |   `-- supabase.ts
 |       |-- App.tsx
 |       |-- index.css
 |       `-- main.tsx
@@ -109,20 +113,22 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 
 - `server.ts`: punto de entrada HTTP. En desarrollo monta Vite como middleware; en produccion sirve `dist/public`.
 - `backend/app.ts`: configura Express, CORS, JSON, health check, rutas `/api/*`, scheduler de recordatorios y manejador global de errores.
-- `backend/src/modules/auth`: login, registro y perfil autenticado.
+- `backend/src/modules/auth`: sincronizacion de usuarios autenticados por Supabase y perfil autenticado.
 - `backend/src/modules/citas`: gestion de citas, profesionales, proxima cita, disponibilidad y slots.
 - `backend/src/modules/citas/reminders.ts`: scheduler de recordatorios de citas por WhatsApp.
 - `backend/src/modules/users`: perfil del usuario autenticado y cambio de password.
 - `backend/src/modules/notifications`: listado, conteo y marcado de notificaciones.
 - `backend/src/modules/admin`: estadisticas, usuarios, citas globales y reportes administrativos. Requiere rol `ADMIN`.
-- `backend/src/middlewares`: autenticacion JWT, control de roles y validacion con Zod.
-- `backend/src/lib/prisma.ts`: cliente Prisma compartido.
+- `backend/src/middlewares`: autenticacion por token Supabase, control de roles y validacion con Zod.
+- `backend/src/lib/prisma.ts`: cliente Prisma compartido con conexion PostgreSQL directa.
+- `backend/src/lib/supabase.ts`: cliente Supabase de servidor para validar tokens de acceso.
 - `backend/src/lib/twilio.ts`: integracion Twilio.
 - `backend/prisma/schema.prisma`: modelo de datos Prisma.
 - `backend/prisma/seed.ts`: datos iniciales/demo.
 - `backend/schemas`: esquemas Zod para auth, citas y perfil.
 - `frontend/src/api`: clientes Axios por dominio que consumen `/api`.
-- `frontend/src/store/authStore.ts`: estado de autenticacion persistido.
+- `frontend/src/lib/supabase.ts`: cliente Supabase de navegador para iniciar OAuth con Google.
+- `frontend/src/store/authStore.ts`: estado de autenticacion persistido con token Supabase.
 - `frontend/src/App.tsx`: rutas publicas y protegidas de React Router.
 - `frontend/src/layouts/MainLayout.tsx`: layout principal autenticado.
 - `frontend/src/components`: UI compartida, navegacion, barra superior, rutas protegidas y modal de confirmacion.
@@ -131,11 +137,13 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 ## Relacion entre archivos
 
 - `frontend/src/main.tsx` renderiza `App.tsx`.
-- `App.tsx` define `/` como login y protege `/dashboard`, `/appointments`, `/agenda`, `/profile`, `/notifications`, `/settings`, `/urgent-help` y `/admin` con `ProtectedRoute`.
-- Los clientes en `frontend/src/api/*.ts` usan `frontend/src/api/axios.ts`, que agrega automaticamente el token JWT desde `localStorage`.
+- `App.tsx` define `/` como login, `/auth/callback` como retorno OAuth y protege `/dashboard`, `/appointments`, `/agenda`, `/profile`, `/notifications`, `/settings`, `/urgent-help` y `/admin` con `ProtectedRoute`.
+- `Login.tsx` inicia OAuth Google con Supabase y redirige a `/auth/callback`.
+- `AuthCallback.tsx` procesa la sesion Supabase, llama `/api/auth/sync`, guarda usuario/token en `authStore` y redirige al dashboard.
+- Los clientes en `frontend/src/api/*.ts` usan `frontend/src/api/axios.ts`, que agrega automaticamente el token persistido desde `localStorage`.
 - `backend/app.ts` monta las rutas de cada modulo bajo `/api`.
 - Las rutas llaman a sus controladores; los controladores usan Prisma y utilidades compartidas.
-- `auth.middleware.ts` valida JWT antes de rutas privadas.
+- `auth.middleware.ts` valida el token Supabase, verifica dominio permitido y carga el usuario interno desde Prisma.
 - `role.middleware.ts` restringe rutas administrativas.
 - `validate.middleware.ts` valida payloads con esquemas Zod.
 - `schema.prisma` define entidades usadas por controladores, seed y consultas Prisma.
@@ -172,8 +180,7 @@ Base: `/api`
 
 Auth:
 
-- `POST /auth/login`: iniciar sesion.
-- `POST /auth/register`: registrar usuario.
+- `POST /auth/sync`: sincronizar el usuario autenticado por Supabase con la base de datos local. Requiere `Authorization: Bearer <supabase_access_token>`.
 - `GET /auth/me`: obtener usuario autenticado. Requiere auth.
 
 Citas y slots, todos requieren auth:
@@ -222,7 +229,8 @@ Admin, todos requieren auth y rol `ADMIN`:
 - `lucide-react`, `motion`: UI e interacciones.
 - `express`, `cors`: API HTTP.
 - `zod`: validacion de entradas.
-- `jsonwebtoken`, `bcryptjs`: autenticacion y password hashing.
+- `@supabase/supabase-js`: OAuth Google y validacion de tokens Supabase.
+- `jsonwebtoken`, `bcryptjs`: dependencias historicas para autenticacion/password; revisar si siguen siendo necesarias despues de completar la migracion a Supabase.
 - `@prisma/client`, `prisma`, `@prisma/adapter-pg`, `pg`: ORM y PostgreSQL.
 - `twilio`: mensajes WhatsApp/SMS.
 - `node-cron`: tareas programadas.
@@ -239,11 +247,21 @@ Admin, todos requieren auth y rol `ADMIN`:
 - `npm run db:studio`: abre Prisma Studio.
 - `npm run db:seed`: carga datos demo.
 
+## Variables de entorno relevantes
+
+- `DIRECT_URL`: cadena de conexion PostgreSQL directa usada por Prisma runtime y configuracion Prisma.
+- `DATABASE_URL`: aun aparece en `backend/prisma/seed.ts`; revisar si debe migrarse a `DIRECT_URL` para consistencia.
+- `SUPABASE_URL`: URL del proyecto Supabase usada por el backend.
+- `SUPABASE_SERVICE_ROLE_KEY`: service role key del backend. No debe exponerse en frontend ni commits.
+- `VITE_SUPABASE_URL`: URL del proyecto Supabase expuesta al cliente Vite.
+- `VITE_SUPABASE_ANON_KEY`: anon key de Supabase expuesta al cliente Vite.
+
 ## Historial resumido de cambios
 
 - 2026-06-04: Se crea este documento de contexto del proyecto.
 - 2026-06-04: Se crea `.ai/rules.md` con reglas operativas de trabajo, Git, documentacion y entrega.
 - 2026-06-04: Se corrigen errores TypeScript antes de publicar la rama: relaciones Prisma en reportes admin, nombre de estudiante en confirmaciones de cita y configuracion Prisma.
+- 2026-06-05: Se migra el flujo de autenticacion a Supabase OAuth con Google institucional, se agrega callback frontend, sincronizacion `/auth/sync`, validacion de tokens Supabase en middleware y variables de entorno Supabase/DIRECT_URL.
 
 ## Tareas pendientes
 
@@ -252,5 +270,7 @@ Admin, todos requieren auth y rol `ADMIN`:
 - Crear migraciones Prisma versionadas si el esquema cambia.
 - Agregar o mantener pruebas automatizadas para endpoints criticos.
 - Revisar codificacion de caracteres en documentos existentes si aparecen textos corruptos.
-- Documentar variables de entorno requeridas para JWT, PostgreSQL y Twilio.
+- Revisar dependencias y esquemas de autenticacion legacy (`jsonwebtoken`, `bcryptjs`, `backend/schemas/auth.schema.ts`, `backend/utils/jwt.ts`) despues de completar la migracion a Supabase.
+- Alinear `backend/prisma/seed.ts` con `DIRECT_URL` o documentar por que conserva `DATABASE_URL`.
+- Documentar variables de entorno requeridas para Supabase, PostgreSQL y Twilio.
 - Completar documentacion de reglas de negocio por rol y estado de cita.
