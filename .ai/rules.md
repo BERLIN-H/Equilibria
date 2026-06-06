@@ -110,6 +110,63 @@ Variables relacionadas:
 
 - Backend: `RESEND_API_KEY`, `EMAIL_FROM`, `RESEND_DEV_EMAIL`, `NODE_ENV`.
 
+## Reglas de Google Calendar
+
+La integracion con Google Calendar sincroniza eventos de citas desde el backend.
+
+Mantener estas reglas al modificar Google Calendar:
+
+1. Usar `backend/src/lib/googleCalendar.ts` como cliente compartido.
+2. Usar service account con claves privadas; nunca exponer en frontend ni versionarse.
+3. Guardar `googleEventId` en `Cita.googleEventId` cuando se cree un evento.
+4. Actualizar el evento Google si se reagenda la cita (cambio de fecha/hora).
+5. Eliminar el evento Google si se cancela la cita.
+6. Si la integracion falla, capturar y registrar el error sin romper el flujo de cita local.
+7. Solo profesionales y admins pueden ver/editar eventos en Google Calendar; estudiantes no.
+
+Variables relacionadas:
+
+- Backend: `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `GOOGLE_CALENDAR_ID`.
+
+## Reglas del Modulo Pacientes
+
+El modulo de pacientes expone el historial de estudiantes atendidos por psicologos.
+
+Mantener estas reglas al modificar pacientes:
+
+1. Solo usuarios con rol `PSYCHOLOGIST` pueden acceder a `/api/patients`.
+2. `GET /patients` lista estudiantes unicos deduplicados por estudiante, con total de sesiones, ultima cita y estado.
+3. `GET /patients/:id` expone ficha del estudiante e historial de citas con ese psicologo especifico.
+4. La edicion de notas clinicas (`psychNotes`) solo la puede hacer el psicologo asignado.
+5. Los datos sensibles (notas clinicas, historial) no deben exponerse en listados; solo en fichas individuales.
+6. Usar `backend/src/modules/patients/patients.controller.ts` y `backend/src/modules/patients/patients.routes.ts`.
+7. En frontend, usar `frontend/src/api/patients.ts` para consumir estos endpoints.
+8. Sidebar debe mostrar opcion "Pacientes" solo para roles `PSYCHOLOGIST`.
+
+Endpoints:
+
+- `GET /api/patients`: listar.
+- `GET /api/patients/:id`: ficha + historial.
+- `PATCH /api/patients/:id`: actualizar notas clinicas.
+
+## Reglas de Notificaciones WhatsApp
+
+El envio de WhatsApp usa Twilio desde el backend.
+
+Mantener estas reglas al modificar WhatsApp:
+
+1. Usar `backend/src/lib/twilio.ts` como cliente compartido.
+2. Enviar WhatsApp solo cuando proceda: confirmacion de cita, cancelacion, cambios importantes.
+3. No exponer `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` ni `TWILIO_PHONE_FROM` en frontend.
+4. No versionar llaves reales ni archivos `.env`.
+5. Los numeros de telefono deben estar validados y en formato internacional (+57...).
+6. Si la integracion falla, registrar pero no romper el flujo principal de cita.
+7. Los mensajes deben ser breves, claros y proporcionar informacion esencial (fecha, hora, ubicacion).
+
+Variables relacionadas:
+
+- Backend: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_FROM`.
+
 ## Despues de Programar
 
 Entregar:

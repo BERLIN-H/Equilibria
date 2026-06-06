@@ -38,6 +38,7 @@ model Cita {
   notes          String?
   psychNotes     String?
   studentPhone   String?
+  googleEventId  String?    // ← agrega esta línea
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
   student        User       @relation("StudentCitas", fields: [studentId], references: [id])

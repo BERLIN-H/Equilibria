@@ -7,6 +7,9 @@ import usersRoutes from './src/modules/users/users.routes';
 import notificationsRoutes from './src/modules/notifications/notifications.routes';
 import adminRoutes from './src/modules/admin/admin.routes';
 import { startReminderScheduler } from './src/modules/citas/reminders';
+import patientsRouter from './src/modules/patients/patients.routes';
+
+
 
 const app = express();
 
@@ -27,6 +30,7 @@ app.use('/api/citas', citasRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/patients', patientsRouter);
 
 // Global error handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

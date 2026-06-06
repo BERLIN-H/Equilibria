@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Calendar, Clock, ArrowRight, Brain, Heart, Sparkles,
-  CheckCircle, XCircle, FileText, User, TrendingUp, Phone,
+  CheckCircle, XCircle, FileText, TrendingUp, Phone,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -27,9 +27,9 @@ const wellnessTips = [
 // ─── Vista del ESTUDIANTE ────────────────────────────────────────────────────
 const StudentDashboard = ({ user }: { user: any }) => {
   const navigate = useNavigate();
-  const [nextCita, setNextCita]   = useState<Cita | null>(null);
-  const [citas, setCitas]         = useState<Cita[]>([]);
-  const [loading, setLoading]     = useState(true);
+  const [nextCita, setNextCita] = useState<Cita | null>(null);
+  const [stats, setStats]       = useState({ completadas: 0, proximas: 0 });
+  const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
     Promise.all([
@@ -37,7 +37,11 @@ const StudentDashboard = ({ user }: { user: any }) => {
       citasApi.getAll().catch(() => []),
     ]).then(([next, all]) => {
       setNextCita(next as Cita | null);
-      setCitas((all as Cita[]).slice(0, 5));
+      const allCitas = all as Cita[];
+      setStats({
+        completadas: allCitas.filter(c => c.status === 'COMPLETADA').length,
+        proximas:    allCitas.filter(c => c.status === 'PENDIENTE' || c.status === 'CONFIRMADA').length,
+      });
       setLoading(false);
     });
   }, []);
@@ -46,9 +50,6 @@ const StudentDashboard = ({ user }: { user: any }) => {
   const greeting = hour < 12 ? 'Buenos días' : hour < 18 ? 'Buenas tardes' : 'Buenas noches';
 
   if (loading) return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" /></div>;
-
-  const completadas = citas.filter(c => c.status === 'COMPLETADA').length;
-  const proximas    = citas.filter(c => c.status === 'PENDIENTE' || c.status === 'CONFIRMADA').length;
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
@@ -104,7 +105,7 @@ const StudentDashboard = ({ user }: { user: any }) => {
             <CheckCircle size={22} className="text-green-600" />
           </div>
           <div>
-            <p className="text-2xl font-black text-on-surface">{completadas}</p>
+            <p className="text-2xl font-black text-on-surface">{stats.completadas}</p>
             <p className="text-xs text-on-surface-variant">Sesiones completadas</p>
           </div>
         </motion.div>
@@ -114,7 +115,7 @@ const StudentDashboard = ({ user }: { user: any }) => {
             <Calendar size={22} className="text-primary" />
           </div>
           <div>
-            <p className="text-2xl font-black text-on-surface">{proximas}</p>
+            <p className="text-2xl font-black text-on-surface">{stats.proximas}</p>
             <p className="text-xs text-on-surface-variant">Citas programadas</p>
           </div>
         </motion.div>
@@ -135,32 +136,6 @@ const StudentDashboard = ({ user }: { user: any }) => {
           <p className="text-xs opacity-75 mt-1">Recursos de crisis inmediatos</p>
         </button>
       </div>
-
-      {/* Historial de citas */}
-      {citas.length > 0 && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
-          className="bg-white rounded-2xl border border-outline-variant/20 shadow-sm p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display font-bold text-on-surface">Historial de citas</h3>
-            <button onClick={() => navigate('/appointments')} className="text-sm text-primary font-bold hover:underline">Ver todas</button>
-          </div>
-          <div className="space-y-2">
-            {citas.map(c => (
-              <div key={c.id} className="flex items-center justify-between py-2.5 border-b border-outline-variant/10 last:border-0">
-                <div>
-                  <p className="text-sm font-bold text-on-surface">{c.type}</p>
-                  <p className="text-xs text-outline">
-                    {new Date(c.date).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })} · {c.professional.name}
-                  </p>
-                </div>
-                <span className={`text-xs px-2 py-1 rounded-full font-bold border ${statusColors[c.status]}`}>
-                  {statusLabels[c.status]}
-                </span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      )}
 
       {/* Consejos */}
       <div>
@@ -186,16 +161,16 @@ const StudentDashboard = ({ user }: { user: any }) => {
 // ─── Vista del PSICÓLOGO ─────────────────────────────────────────────────────
 const PsychologistDashboard = ({ user }: { user: any }) => {
   const navigate = useNavigate();
-  const [citas, setCitas]           = useState<Cita[]>([]);
-  const [loading, setLoading]       = useState(true);
+  const [citas, setCitas]               = useState<Cita[]>([]);
+  const [loading, setLoading]           = useState(true);
   const [selectedCita, setSelectedCita] = useState<Cita | null>(null);
-  const [psychNotes, setPsychNotes] = useState('');
-  const [saving, setSaving]         = useState(false);
-  const [saved, setSaved]           = useState(false);
+  const [psychNotes, setPsychNotes]     = useState('');
+  const [saving, setSaving]             = useState(false);
+  const [saved, setSaved]               = useState(false);
 
   useEffect(() => {
     citasApi.getAll().then(data => {
-      setCitas((data as Cita[]).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      setCitas((data as Cita[]).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -240,9 +215,9 @@ const PsychologistDashboard = ({ user }: { user: any }) => {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Citas hoy',     value: citas.filter(c => new Date(c.date).toDateString() === new Date().toDateString()).length, color: 'bg-primary/10 text-primary', icon: Calendar },
-          { label: 'Pendientes',    value: pendientes.length,  color: 'bg-yellow-100 text-yellow-600', icon: Clock },
-          { label: 'Completadas',   value: completadas.length, color: 'bg-green-100 text-green-600',   icon: CheckCircle },
+          { label: 'Citas hoy',   value: citas.filter(c => new Date(c.date).toDateString() === new Date().toDateString()).length, color: 'bg-primary/10 text-primary',       icon: Calendar },
+          { label: 'Pendientes',  value: pendientes.length,  color: 'bg-yellow-100 text-yellow-600', icon: Clock },
+          { label: 'Completadas', value: completadas.length, color: 'bg-green-100 text-green-600',   icon: CheckCircle },
         ].map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
             className="bg-white rounded-2xl border border-outline-variant/20 shadow-sm p-4 flex items-center gap-3">
@@ -271,7 +246,7 @@ const PsychologistDashboard = ({ user }: { user: any }) => {
               <button key={c.id} onClick={() => handleSelectCita(c)}
                 className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-surface-container/40 transition-colors text-left">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs shrink-0">
-                  {c.student?.name?.split(' ').map((n:string) => n[0]).slice(0,2).join('').toUpperCase()}
+                  {c.student?.name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-on-surface text-sm truncate">{c.student?.name}</p>
@@ -300,7 +275,7 @@ const PsychologistDashboard = ({ user }: { user: any }) => {
               <button key={c.id} onClick={() => handleSelectCita(c)}
                 className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-surface-container/40 transition-colors text-left">
                 <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold text-xs shrink-0">
-                  {c.student?.name?.split(' ').map((n:string) => n[0]).slice(0,2).join('').toUpperCase()}
+                  {c.student?.name?.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-on-surface text-sm truncate">{c.student?.name}</p>
