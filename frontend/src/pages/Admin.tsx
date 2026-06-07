@@ -7,6 +7,9 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { adminApi, AdminStats } from '../api/admin';
 import { citasApi } from '../api/citas';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 interface UserData {
   id: number; name: string; email: string; role: string;
@@ -35,17 +38,17 @@ const statusColors: Record<string, string> = {
 };
 const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const timeToMinutes = (t: string) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-const minutesToTime = (m: number) => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+const minutesToTime = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 
 type Tab = 'dashboard' | 'users' | 'citas' | 'psychologists' | 'availability' | 'reports';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: 'dashboard',    label: 'Dashboard',      icon: BarChart2 },
-  { id: 'users',        label: 'Usuarios',        icon: Users },
-  { id: 'citas',        label: 'Citas',           icon: Calendar },
-  { id: 'psychologists',label: 'Psicólogos',      icon: UserCheck },
-  { id: 'availability', label: 'Horarios',        icon: Clock },
-  { id: 'reports',      label: 'Reportes',        icon: TrendingUp },
+  { id: 'dashboard', label: 'Dashboard', icon: BarChart2 },
+  { id: 'users', label: 'Usuarios', icon: Users },
+  { id: 'citas', label: 'Citas', icon: Calendar },
+  { id: 'psychologists', label: 'Psicólogos', icon: UserCheck },
+  { id: 'availability', label: 'Horarios', icon: Clock },
+  { id: 'reports', label: 'Reportes', icon: TrendingUp },
 ];
 
 const StatCard = ({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: number | string; color: string }) => (
@@ -62,31 +65,30 @@ const StatCard = ({ icon: Icon, label, value, color }: { icon: React.ElementType
 );
 
 const Admin: React.FC = () => {
-  const [tab, setTab]             = useState<Tab>('dashboard');
-  const [stats, setStats]         = useState<AdminStats | null>(null);
-  const [users, setUsers]         = useState<UserData[]>([]);
-  const [total, setTotal]         = useState(0);
-  const [page, setPage]           = useState(1);
+  const [tab, setTab] = useState<Tab>('dashboard');
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [users, setUsers] = useState<UserData[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [search, setSearch]       = useState('');
+  const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
-  const [loading, setLoading]     = useState(true);
-  const [allCitas, setAllCitas]   = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [allCitas, setAllCitas] = useState<any[]>([]);
   const [citasLoading, setCitasLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
   const [psychReports, setPsychReports] = useState<PsychReport[]>([]);
   const [cancelReports, setCancelReports] = useState<CancelReport[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
-  const [slots, setSlots]         = useState<SlotConfig[]>([]);
+  const [slots, setSlots] = useState<SlotConfig[]>([]);
   const [psychologists, setPsychologists] = useState<UserData[]>([]);
   const [selectedPsych, setSelectedPsych] = useState<number | null>(null);
   const [showSlotForm, setShowSlotForm] = useState(false);
   const [savingSlot, setSavingSlot] = useState(false);
-  const [slotForm, setSlotForm]   = useState({ dayOfWeek: '1', startTime: '08:00', endTime: '11:00', durationMin: '50' });
-  const [editUser, setEditUser]   = useState<UserData | null>(null);
+  const [slotForm, setSlotForm] = useState({ dayOfWeek: '1', startTime: '08:00', endTime: '11:00', durationMin: '50' });
+  const [editUser, setEditUser] = useState<UserData | null>(null);
   const [expandedPsych, setExpandedPsych] = useState<number | null>(null);
-
-  useEffect(() => { adminApi.getStats().then(setStats).catch(() => {}); }, []);
+  
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -160,21 +162,170 @@ const Admin: React.FC = () => {
   };
 
   const handleDeleteSlot = async (id: number) => {
-    await citasApi.deleteSlot(id).catch(() => {});
+    await citasApi.deleteSlot(id).catch(() => { });
     await loadSlots();
   };
 
   const handleUpdateUser = async () => {
     if (!editUser) return;
-    await adminApi.updateUser(editUser.id, { role: editUser.role, name: editUser.name }).catch(() => {});
+    await adminApi.updateUser(editUser.id, { role: editUser.role, name: editUser.name }).catch(() => { });
     setEditUser(null);
     loadUsers();
   };
 
   const handleDeleteUser = async (id: number) => {
     if (!confirm('¿Seguro que deseas eliminar este usuario?')) return;
-    await adminApi.deleteUser(id).catch(() => {});
+    await adminApi.deleteUser(id).catch(() => { });
     loadUsers();
+  };
+
+  const exportPDF = () => {
+    const doc = new jsPDF();
+
+    // Header
+    doc.setFillColor(26, 82, 118);
+    doc.rect(0, 0, 210, 28, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('EQUILIBRIA', 14, 12);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Centro de Apoyo Psicológico — Universidad de La Guajira', 14, 20);
+    doc.setFontSize(9);
+    doc.text(`Generado: ${new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}`, 140, 20);
+
+    let y = 36;
+
+    // Actividad por psicólogo
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Actividad por Psicólogo', 14, y);
+    y += 6;
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Psicólogo', 'Email', 'Total', 'Completadas', 'Canceladas', 'Pendientes', 'Este mes']],
+      body: psychReports.map(p => [
+        p.name ?? '—',
+        p.email,
+        p.total,
+        p.completadas,
+        p.canceladas,
+        p.pendientes,
+        p.esteMes,
+      ]),
+      headStyles: { fillColor: [26, 82, 118], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+      bodyStyles: { fontSize: 9 },
+      alternateRowStyles: { fillColor: [240, 244, 248] },
+      margin: { left: 14, right: 14 },
+    });
+
+    y = (doc as any).lastAutoTable.finalY + 14;
+
+    // Reporte de cancelaciones
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Cancelaciones por Psicólogo', 14, y);
+    y += 6;
+
+    const cancelRows: any[] = [];
+    cancelReports.forEach(p => {
+      if (p.cancelaciones.length === 0) {
+        cancelRows.push([p.name, p.email, '—', '—', '—', `${p.canceladas}/${p.totalCitas}`]);
+      } else {
+        p.cancelaciones.forEach((c, i) => {
+          cancelRows.push([
+            i === 0 ? p.name : '',
+            i === 0 ? p.email : '',
+            c.student.name,
+            c.type,
+            new Date(c.date).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }),
+            i === 0 ? `${p.canceladas}/${p.totalCitas}` : '',
+          ]);
+        });
+      }
+    });
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Psicólogo', 'Email', 'Estudiante', 'Tipo', 'Fecha cita', 'Cancelaciones']],
+      body: cancelRows,
+      headStyles: { fillColor: [180, 30, 30], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+      bodyStyles: { fontSize: 9 },
+      alternateRowStyles: { fillColor: [255, 245, 245] },
+      margin: { left: 14, right: 14 },
+    });
+
+    // Footer
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(`Página ${i} de ${pageCount} — Equilibria`, 14, 290);
+    }
+
+    doc.save(`reporte-equilibria-${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  const exportExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    // Hoja 1 — Actividad psicólogos
+    const psychData = psychReports.map(p => ({
+      'Psicólogo': p.name ?? '—',
+      'Email': p.email,
+      'Total citas': p.total,
+      'Completadas': p.completadas,
+      'Canceladas': p.canceladas,
+      'Pendientes': p.pendientes,
+      'Este mes': p.esteMes,
+    }));
+    const ws1 = XLSX.utils.json_to_sheet(psychData);
+    ws1['!cols'] = [{ wch: 25 }, { wch: 30 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, ws1, 'Actividad Psicólogos');
+
+    // Hoja 2 — Cancelaciones
+    const cancelData: any[] = [];
+    cancelReports.forEach(p => {
+      if (p.cancelaciones.length === 0) {
+        cancelData.push({ 'Psicólogo': p.name, 'Email psicólogo': p.email, 'Estudiante': '—', 'Tipo': '—', 'Fecha': '—', 'Total cancelaciones': p.canceladas });
+      } else {
+        p.cancelaciones.forEach(c => {
+          cancelData.push({
+            'Psicólogo': p.name,
+            'Email psicólogo': p.email,
+            'Estudiante': c.student.name,
+            'Tipo': c.type,
+            'Fecha': new Date(c.date).toLocaleDateString('es-CO'),
+            'Total cancelaciones': p.canceladas,
+          });
+        });
+      }
+    });
+    const ws2 = XLSX.utils.json_to_sheet(cancelData);
+    ws2['!cols'] = [{ wch: 25 }, { wch: 30 }, { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Cancelaciones');
+
+    // Hoja 3 — Resumen general
+    if (stats) {
+      const resumen = [
+        { 'Métrica': 'Total estudiantes', 'Valor': stats.totalUsers },
+        { 'Métrica': 'Total citas', 'Valor': stats.totalCitas },
+        { 'Métrica': 'Citas completadas', 'Valor': stats.citasCompletadas },
+        { 'Métrica': 'Citas pendientes', 'Valor': stats.citasPendientes },
+        { 'Métrica': 'Citas este mes', 'Valor': stats.citasThisMonth },
+        { 'Métrica': 'Alertas SOS', 'Valor': stats.sosAlerts },
+        { 'Métrica': 'Fecha generación', 'Valor': new Date().toLocaleDateString('es-CO') },
+      ];
+      const ws3 = XLSX.utils.json_to_sheet(resumen);
+      ws3['!cols'] = [{ wch: 25 }, { wch: 15 }];
+      XLSX.utils.book_append_sheet(wb, ws3, 'Resumen General');
+    }
+
+    XLSX.writeFile(wb, `reporte-equilibria-${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   return (
@@ -200,12 +351,12 @@ const Admin: React.FC = () => {
       {tab === 'dashboard' && stats && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <StatCard icon={Users}        label="Estudiantes"       value={stats.totalUsers}       color="bg-blue-100 text-blue-600" />
-            <StatCard icon={Calendar}     label="Total citas"        value={stats.totalCitas}       color="bg-primary/10 text-primary" />
-            <StatCard icon={CheckCircle}  label="Completadas"        value={stats.citasCompletadas} color="bg-green-100 text-green-600" />
-            <StatCard icon={Clock}        label="Pendientes"         value={stats.citasPendientes}  color="bg-yellow-100 text-yellow-600" />
-            <StatCard icon={TrendingUp}   label="Citas este mes"     value={stats.citasThisMonth}   color="bg-purple-100 text-purple-600" />
-            <StatCard icon={AlertTriangle} label="Alertas SOS"       value={stats.sosAlerts}        color="bg-red-100 text-red-600" />
+            <StatCard icon={Users} label="Estudiantes" value={stats.totalUsers} color="bg-blue-100 text-blue-600" />
+            <StatCard icon={Calendar} label="Total citas" value={stats.totalCitas} color="bg-primary/10 text-primary" />
+            <StatCard icon={CheckCircle} label="Completadas" value={stats.citasCompletadas} color="bg-green-100 text-green-600" />
+            <StatCard icon={Clock} label="Pendientes" value={stats.citasPendientes} color="bg-yellow-100 text-yellow-600" />
+            <StatCard icon={TrendingUp} label="Citas este mes" value={stats.citasThisMonth} color="bg-purple-100 text-purple-600" />
+            <StatCard icon={AlertTriangle} label="Alertas SOS" value={stats.sosAlerts} color="bg-red-100 text-red-600" />
           </div>
         </div>
       )}
@@ -240,7 +391,7 @@ const Admin: React.FC = () => {
                 {users.map(u => (
                   <div key={u.id} className="flex items-center gap-4 px-4 py-3 hover:bg-surface-container/30 transition-colors">
                     <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
-                      {u.name?.split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase()}
+                      {u.name?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-on-surface text-sm truncate">{u.name}</p>
@@ -262,12 +413,12 @@ const Admin: React.FC = () => {
             )}
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-outline-variant/10">
-                <button onClick={() => setPage(p => Math.max(1, p-1))} disabled={page === 1}
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                   className="flex items-center gap-1 text-sm text-on-surface-variant hover:text-on-surface disabled:opacity-30">
                   <ChevronLeft size={16} /> Anterior
                 </button>
                 <span className="text-sm text-on-surface-variant">Página {page} de {totalPages}</span>
-                <button onClick={() => setPage(p => Math.min(totalPages, p+1))} disabled={page === totalPages}
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
                   className="flex items-center gap-1 text-sm text-on-surface-variant hover:text-on-surface disabled:opacity-30">
                   Siguiente <ChevronRight size={16} />
                 </button>
@@ -333,7 +484,7 @@ const Admin: React.FC = () => {
                 <div key={p.id} className="bg-white rounded-2xl border border-outline-variant/20 shadow-sm overflow-hidden">
                   <div className="flex items-center gap-4 px-5 py-4">
                     <div className="w-11 h-11 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold">
-                      {p.name?.split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase()}
+                      {p.name?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
                     </div>
                     <div className="flex-1">
                       <p className="font-bold text-on-surface">{p.name}</p>
@@ -438,9 +589,23 @@ const Admin: React.FC = () => {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-display font-bold text-on-surface">Reportes</h2>
-            <button onClick={loadReports} className="flex items-center gap-2 text-sm text-primary font-bold hover:underline">
-              <RefreshCw size={16} /> Actualizar
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={loadReports} className="flex items-center gap-2 text-sm text-primary font-bold hover:underline">
+                <RefreshCw size={16} /> Actualizar
+              </button>
+              <button
+                onClick={exportExcel}
+                disabled={reportsLoading || psychReports.length === 0}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors">
+                <TrendingUp size={16} /> Excel
+              </button>
+              <button
+                onClick={exportPDF}
+                disabled={reportsLoading || psychReports.length === 0}
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors">
+                <BarChart2 size={16} /> PDF
+              </button>
+            </div>
           </div>
 
           {reportsLoading ? (
@@ -487,7 +652,7 @@ const Admin: React.FC = () => {
                         className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-container/30 transition-colors">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-xs">
-                            {p.name?.split(' ').map(n => n[0]).slice(0,2).join('').toUpperCase()}
+                            {p.name?.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()}
                           </div>
                           <div className="text-left">
                             <p className="font-bold text-on-surface text-sm">{p.name}</p>
