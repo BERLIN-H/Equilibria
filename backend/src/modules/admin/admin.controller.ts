@@ -140,13 +140,17 @@ export const deleteUser = async (req: AuthRequest, res: Response): Promise<void>
     return;
   }
 
-  // No permitir eliminar el propio usuario admin
   if (id === req.user!.id) {
     res.status(400).json({ error: 'No puedes eliminar tu propia cuenta' });
     return;
   }
 
+  // Borrar en orden para respetar foreign keys
+  await prisma.notification.deleteMany({ where: { userId: id } });
+  await prisma.availableSlot.deleteMany({ where: { professionalId: id } });
+  await prisma.cita.deleteMany({ where: { OR: [{ studentId: id }, { professionalId: id }] } });
   await prisma.user.delete({ where: { id } });
+
   res.status(204).send();
 };
 

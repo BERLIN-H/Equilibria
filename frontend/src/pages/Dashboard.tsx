@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Calendar, Clock, ArrowRight, Brain, Heart, Sparkles,
-  CheckCircle, FileText, Phone, Users, UserCheck,
+  CheckCircle, FileText, Phone, Users,
   ShieldCheck, BarChart3, AlertTriangle, TrendingUp,
   ChevronRight, Bell,
 } from 'lucide-react';
@@ -30,8 +30,8 @@ const wellnessTips = [
 // ─── Vista del ADMIN ─────────────────────────────────────────────────────────
 const AdminDashboard = ({ user }: { user: any }) => {
   const navigate = useNavigate();
-  const [stats, setStats]   = useState<any>(null);
-  const [citas, setCitas]   = useState<any[]>([]);
+  const [stats, setStats]     = useState<any>(null);
+  const [citas, setCitas]     = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -55,25 +55,23 @@ const AdminDashboard = ({ user }: { user: any }) => {
   );
 
   const statCards = [
-    { label: 'Estudiantes',    value: stats?.totalUsers ?? 0,        color: 'bg-blue-50 text-blue-600',    icon: Users },
-    { label: 'Total citas',    value: stats?.totalCitas ?? 0,        color: 'bg-purple-50 text-purple-600', icon: Calendar },
-    { label: 'Completadas',    value: stats?.citasCompletadas ?? 0,  color: 'bg-green-50 text-green-600',   icon: CheckCircle },
-    { label: 'Pendientes',     value: stats?.citasPendientes ?? 0,   color: 'bg-yellow-50 text-yellow-600', icon: Clock },
-    { label: 'Este mes',       value: stats?.citasThisMonth ?? 0,    color: 'bg-indigo-50 text-indigo-600', icon: TrendingUp },
-    { label: 'Alertas SOS',    value: stats?.sosAlerts ?? 0,         color: 'bg-red-50 text-red-600',       icon: AlertTriangle },
+    { label: 'Estudiantes',  value: stats?.totalUsers ?? 0,       color: 'bg-blue-50 text-blue-600',     icon: Users },
+    { label: 'Total citas',  value: stats?.totalCitas ?? 0,       color: 'bg-purple-50 text-purple-600', icon: Calendar },
+    { label: 'Completadas',  value: stats?.citasCompletadas ?? 0, color: 'bg-green-50 text-green-600',   icon: CheckCircle },
+    { label: 'Pendientes',   value: stats?.citasPendientes ?? 0,  color: 'bg-yellow-50 text-yellow-600', icon: Clock },
+    { label: 'Este mes',     value: stats?.citasThisMonth ?? 0,   color: 'bg-indigo-50 text-indigo-600', icon: TrendingUp },
+    { label: 'Alertas SOS',  value: stats?.sosAlerts ?? 0,        color: 'bg-red-50 text-red-600',       icon: AlertTriangle },
   ];
 
   const quickActions = [
-    { label: 'Usuarios',        desc: 'Gestionar roles y cuentas',  icon: Users,      path: '/admin',        color: 'bg-blue-500' },
-    { label: 'Todas las citas', desc: 'Ver y filtrar citas',        icon: Calendar,   path: '/appointments', color: 'bg-purple-500' },
-    { label: 'Reportes',        desc: 'Actividad de psicólogos',    icon: BarChart3,  path: '/admin',        color: 'bg-indigo-500' },
-    { label: 'Notificaciones',  desc: 'Ver alertas del sistema',    icon: Bell,       path: '/notifications',color: 'bg-orange-500' },
+    { label: 'Usuarios',        desc: 'Gestionar roles y cuentas', icon: Users,     path: '/admin',         color: 'bg-blue-500' },
+    { label: 'Todas las citas', desc: 'Ver y filtrar citas',       icon: Calendar,  path: '/appointments',  color: 'bg-purple-500' },
+    { label: 'Reportes',        desc: 'Actividad de psicólogos',   icon: BarChart3, path: '/admin',         color: 'bg-indigo-500' },
+    { label: 'Notificaciones',  desc: 'Ver alertas del sistema',   icon: Bell,      path: '/notifications', color: 'bg-orange-500' },
   ];
 
   return (
     <div className="max-w-5xl mx-auto py-8 px-4 space-y-6">
-
-      {/* Saludo */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-center gap-3 mb-1">
           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -84,16 +82,11 @@ const AdminDashboard = ({ user }: { user: any }) => {
         <h1 className="text-3xl font-display font-black text-on-surface">
           {greeting}, {user?.name?.split(' ')[0] ?? 'Admin'} 👋
         </h1>
-        <p className="text-on-surface-variant mt-1">
-          Aquí tienes un resumen del estado actual de la plataforma.
-        </p>
+        <p className="text-on-surface-variant mt-1">Aquí tienes un resumen del estado actual de la plataforma.</p>
       </motion.div>
 
-      {/* Estadísticas */}
       <div>
-        <h2 className="font-display font-bold text-on-surface mb-3 text-sm uppercase tracking-wide text-outline">
-          Estadísticas generales
-        </h2>
+        <h2 className="font-display font-bold text-on-surface mb-3 text-sm uppercase tracking-wide text-outline">Estadísticas generales</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {statCards.map((s, i) => (
             <motion.div key={s.label}
@@ -111,11 +104,8 @@ const AdminDashboard = ({ user }: { user: any }) => {
         </div>
       </div>
 
-      {/* Accesos rápidos */}
       <div>
-        <h2 className="font-display font-bold text-on-surface mb-3 text-sm uppercase tracking-wide text-outline">
-          Accesos rápidos
-        </h2>
+        <h2 className="font-display font-bold text-on-surface mb-3 text-sm uppercase tracking-wide text-outline">Accesos rápidos</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {quickActions.map((a, i) => (
             <motion.button key={a.label}
@@ -124,7 +114,7 @@ const AdminDashboard = ({ user }: { user: any }) => {
               className="flex flex-col items-start p-4 rounded-2xl text-white hover:opacity-90 transition-opacity text-left shadow-sm"
               style={{ background: `var(--color-${a.color.replace('bg-', '')}, #6366f1)` }}
             >
-              <div className={`${a.color} bg-white/20 w-10 h-10 rounded-xl flex items-center justify-center mb-3`}>
+              <div className="bg-white/20 w-10 h-10 rounded-xl flex items-center justify-center mb-3">
                 <a.icon size={20} className="text-white" />
               </div>
               <p className="font-bold text-sm">{a.label}</p>
@@ -134,7 +124,6 @@ const AdminDashboard = ({ user }: { user: any }) => {
         </div>
       </div>
 
-      {/* Citas recientes */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
         className="bg-white rounded-2xl border border-outline-variant/20 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant/10">
@@ -167,7 +156,6 @@ const AdminDashboard = ({ user }: { user: any }) => {
           </div>
         )}
       </motion.div>
-
     </div>
   );
 };
@@ -308,12 +296,13 @@ const StudentDashboard = ({ user }: { user: any }) => {
 // ─── Vista del PSICÓLOGO ─────────────────────────────────────────────────────
 const PsychologistDashboard = ({ user }: { user: any }) => {
   const navigate = useNavigate();
-  const [citas, setCitas]               = useState<Cita[]>([]);
-  const [loading, setLoading]           = useState(true);
-  const [selectedCita, setSelectedCita] = useState<Cita | null>(null);
-  const [psychNotes, setPsychNotes]     = useState('');
-  const [saving, setSaving]             = useState(false);
-  const [saved, setSaved]               = useState(false);
+  const [citas, setCitas]                     = useState<Cita[]>([]);
+  const [loading, setLoading]                 = useState(true);
+  const [selectedCita, setSelectedCita]       = useState<Cita | null>(null);
+  const [psychNotes, setPsychNotes]           = useState('');
+  const [saving, setSaving]                   = useState(false);
+  const [saved, setSaved]                     = useState(false);
+  const [confirmComplete, setConfirmComplete] = useState(false);
 
   useEffect(() => {
     citasApi.getAll().then(data => {
@@ -329,6 +318,7 @@ const PsychologistDashboard = ({ user }: { user: any }) => {
     setSelectedCita(c);
     setPsychNotes((c as any).psychNotes ?? '');
     setSaved(false);
+    setConfirmComplete(false);
   };
 
   const handleMarkComplete = async (cita: Cita) => {
@@ -337,7 +327,7 @@ const PsychologistDashboard = ({ user }: { user: any }) => {
     setCitas(prev => prev.map(c => c.id === cita.id ? { ...c, status: 'COMPLETADA', psychNotes } as any : c));
     setSaved(true);
     setSaving(false);
-    setTimeout(() => { setSelectedCita(null); setSaved(false); }, 1200);
+    setTimeout(() => { setSelectedCita(null); setSaved(false); setConfirmComplete(false); }, 1200);
   };
 
   const handleSaveNotes = async (cita: Cita) => {
@@ -440,31 +430,47 @@ const PsychologistDashboard = ({ user }: { user: any }) => {
         </div>
       )}
 
+      {/* Modal de cita */}
       <AnimatePresence>
         {selectedCita && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 px-4 pb-4 sm:pb-0">
             <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }}
               className="bg-white rounded-2xl w-full max-w-lg shadow-xl space-y-4 p-6">
+
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-display font-bold text-lg text-on-surface">{selectedCita.student?.name}</h3>
-                  <p className="text-sm text-outline">{selectedCita.type} · {new Date(selectedCita.date).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })} a las {new Date(selectedCita.date).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</p>
+                  <p className="text-sm text-outline">
+                    {selectedCita.type} · {new Date(selectedCita.date).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })} a las {new Date(selectedCita.date).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
                 </div>
-                <button onClick={() => setSelectedCita(null)} className="text-outline hover:text-on-surface p-1">✕</button>
+                <button
+                  onClick={() => { setSelectedCita(null); setConfirmComplete(false); }}
+                  className="text-outline hover:text-on-surface p-1">✕
+                </button>
               </div>
+
               {selectedCita.notes && (
                 <div className="bg-surface-container rounded-xl p-3">
                   <p className="text-xs font-bold text-on-surface-variant mb-1">Notas del estudiante</p>
                   <p className="text-sm text-on-surface">{selectedCita.notes}</p>
                 </div>
               )}
+
               <div>
-                <label className="text-xs font-bold text-on-surface-variant mb-2 block">Observaciones clínicas (solo visibles para ti)</label>
-                <textarea value={psychNotes} onChange={e => setPsychNotes(e.target.value)} rows={4}
+                <label className="text-xs font-bold text-on-surface-variant mb-2 block">
+                  Observaciones clínicas (solo visibles para ti)
+                </label>
+                <textarea
+                  value={psychNotes}
+                  onChange={e => setPsychNotes(e.target.value)}
+                  rows={4}
                   placeholder="Escribe tus observaciones, diagnóstico, plan de tratamiento..."
-                  className="w-full px-4 py-3 border border-outline-variant/30 rounded-xl text-sm focus:outline-none focus:border-primary resize-none" />
+                  className="w-full px-4 py-3 border border-outline-variant/30 rounded-xl text-sm focus:outline-none focus:border-primary resize-none"
+                />
               </div>
+
               <div className="flex gap-3">
                 {saved ? (
                   <div className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-green-50 text-green-700 font-bold text-sm">
@@ -472,16 +478,43 @@ const PsychologistDashboard = ({ user }: { user: any }) => {
                   </div>
                 ) : (
                   <>
-                    <button onClick={() => handleSaveNotes(selectedCita)} disabled={saving}
+                    <button
+                      onClick={() => handleSaveNotes(selectedCita)}
+                      disabled={saving}
                       className="flex-1 py-2.5 rounded-xl border border-outline-variant/30 text-sm font-bold text-on-surface hover:bg-surface-container transition-colors disabled:opacity-50">
                       {saving ? 'Guardando...' : 'Guardar notas'}
                     </button>
+
                     {(selectedCita.status === 'PENDIENTE' || selectedCita.status === 'CONFIRMADA') && (
-                      <button onClick={() => handleMarkComplete(selectedCita)} disabled={saving}
-                        className="flex-1 py-2.5 rounded-xl bg-green-500 text-white text-sm font-bold hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                        <CheckCircle size={16} />
-                        {saving ? 'Guardando...' : 'Marcar completada'}
-                      </button>
+                      !confirmComplete ? (
+                        <button
+                          onClick={() => setConfirmComplete(true)}
+                          disabled={saving}
+                          className="flex-1 py-2.5 rounded-xl bg-green-500 text-white text-sm font-bold hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                          <CheckCircle size={16} />
+                          Marcar completada
+                        </button>
+                      ) : (
+                        <div className="flex-1 flex flex-col gap-2">
+                          <p className="text-xs text-center text-on-surface-variant font-medium">
+                            ¿Confirmas que la sesión fue completada?
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setConfirmComplete(false)}
+                              className="flex-1 py-2 rounded-xl border border-outline-variant/30 text-sm font-bold text-on-surface-variant hover:bg-surface-container transition-colors">
+                              Cancelar
+                            </button>
+                            <button
+                              onClick={() => { setConfirmComplete(false); handleMarkComplete(selectedCita); }}
+                              disabled={saving}
+                              className="flex-1 py-2 rounded-xl bg-green-500 text-white text-sm font-bold hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                              <CheckCircle size={14} />
+                              {saving ? 'Guardando...' : 'Sí, completada'}
+                            </button>
+                          </div>
+                        </div>
+                      )
                     )}
                   </>
                 )}

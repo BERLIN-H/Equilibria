@@ -13,6 +13,8 @@ import UrgentHelp from './pages/UrgentHelp';
 import Admin from './pages/Admin';
 import AuthCallback from './pages/AuthCallback';
 import Patients from './pages/Patients';
+import NotFound from './pages/NotFound';
+
 
 export default function App() {
   return (
@@ -38,7 +40,7 @@ export default function App() {
         </Route>
 
         {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );

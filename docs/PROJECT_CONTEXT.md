@@ -29,7 +29,6 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 |   |   |-- schema.prisma
 |   |   `-- seed.ts
 |   |-- schemas/
-|   |   |-- auth.schema.ts
 |   |   `-- cita.schema.ts
 |   |-- src/
 |   |   |-- lib/
@@ -64,8 +63,6 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 |   |       `-- users/
 |   |           |-- users.controller.ts
 |   |           `-- users.routes.ts
-|   `-- utils/
-|       `-- jwt.ts
 |-- docs/
 |   `-- PROJECT_CONTEXT.md
 |-- frontend/
@@ -91,6 +88,7 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 |       |   |-- Dashboard.tsx
 |       |   |-- Login.tsx
 |       |   |-- AuthCallback.tsx
+|       |   |-- NotFound.tsx
 |       |   |-- Notifications.tsx
 |       |   |-- Patients.tsx
 |       |   |-- Profile.tsx
@@ -112,14 +110,21 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 |-- package.json
 |-- prisma.config.ts
 |-- server.ts
-|-- slots.sql
 |-- tsconfig.json
 `-- vite.config.ts
 ```
 
 ## Historial resumido de cambios
 
-**Actualizacion 2026-06-06:**
+**Actualizacion 2026-06-06 (Lote 2):**
+- Agregado `frontend/src/pages/NotFound.tsx`: Página 404 con diseño consistente y animaciones.
+- Actualizado `frontend/src/App.tsx`: Reemplazar fallback de Navigate con componente NotFound.
+- Refactor `frontend/src/pages/Admin.tsx`: Mejoras en UI/UX y gestión de datos.
+- Refactor `frontend/src/pages/Dashboard.tsx`: Optimización de rendimiento y layout mejorado.
+- Actualizado `backend/src/modules/admin/admin.controller.ts`: Mejoras en lógica de estadísticas.
+- Actualizado `package.json`: Nuevas dependencias para animaciones (motion).
+
+**Actualizacion 2026-06-06 (Lote 1):**
 - Removido `backend/schemas/auth.schema.ts`: validaciones trasladadas a middleware.
 - Removido `backend/utils/jwt.ts`: JWT delegado a Supabase Auth.
 - Removido `slots.sql`: carga de horarios automatizada.
@@ -165,10 +170,13 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 - `frontend/src/api/patients.ts`: cliente para pacientes y actualizacion de notas clinicas.
 - `frontend/src/lib/supabase.ts`: cliente Supabase de navegador para iniciar OAuth con Google.
 - `frontend/src/store/authStore.ts`: estado de autenticacion persistido con token Supabase.
-- `frontend/src/App.tsx`: rutas publicas y protegidas de React Router.
+- `frontend/src/App.tsx`: rutas publicas y protegidas de React Router, con componente NotFound para rutas inexistentes.
 - `frontend/src/layouts/MainLayout.tsx`: layout principal autenticado.
 - `frontend/src/components`: UI compartida, navegacion, barra superior, rutas protegidas y modal de confirmacion.
 - `frontend/src/pages`: pantallas funcionales de la aplicacion.
+  - `NotFound.tsx`: Página 404 con diseño consistente (nuevo en 2026-06-06).
+  - `Admin.tsx`: Dashboard administrativo con estadísticas y gestión de usuarios.
+  - `Dashboard.tsx`: Panel de inicio con información personalizada del usuario.
 - `frontend/src/pages/Patients.tsx`: vista de pacientes para psicologos, con busqueda, ficha del estudiante, historial y edicion de notas clinicas.
 
 ## Relacion entre archivos
