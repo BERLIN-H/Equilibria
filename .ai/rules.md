@@ -169,7 +169,15 @@ Variables relacionadas:
 
 ## Cambios Recientes (2026-06-06)
 
-**Eliminaciones:**
+**Lote 2 - Mejoras de UI y gestión de errores:**
+- Agregado `frontend/src/pages/NotFound.tsx`: Página 404 con animaciones y diseño consistente.
+- Actualizado App.tsx: Usar NotFound en lugar de Navigate para rutas inexistentes.
+- Refactor Admin.tsx: Mejoras significativas en UI/UX, mejor estructura de datos.
+- Refactor Dashboard.tsx: Optimización de rendimiento, layout mejorado.
+- Actualizado admin.controller.ts: Mejoras en cálculo de estadísticas.
+- Agregada dependencia `motion` para animaciones suaves.
+
+**Lote 1 - Eliminaciones:**
 - `backend/schemas/auth.schema.ts`: Validaciones trasladadas a middlewares. Usar Zod directamente en controladores.
 - `backend/utils/jwt.ts`: JWT ahora delegado a Supabase Auth. Las rutas privadas validan con token Bearer.
 - `slots.sql`: Carga de horarios automatizada en seed de Prisma.
@@ -180,7 +188,6 @@ Variables relacionadas:
 **Modificaciones:**
 - Docker: Mejorado para soportar full-stack containerizado con volúmenes persistentes.
 - Sidebar: Oculta "Pacientes" para roles que no sean PSYCHOLOGIST.
-- Dashboard: Refactor para mejor UX y responsividad.
 - .gitignore: Actualizado para excluir archivos sensibles.
 
 ## Despues de Programar
