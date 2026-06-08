@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT - Equilibria
 
-Ultima actualizacion: 2026-06-05
+Ultima actualizacion: 2026-06-07
 
 ## Descripcion general
 
@@ -116,6 +116,19 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 
 ## Historial resumido de cambios
 
+**Actualizacion 2026-06-07 (Lote 3 - Panel Admin Ampliado):**
+- Bloque A: Panel Admin refactorizado con 7 pestañas (Dashboard, Pacientes, Citas, Psicólogos, Horarios, Reportes, Configuración).
+- Bloque A: Nuevos endpoints admin: togglePsychologist, getCitasByUser, getPeakHoursReport, getTopPsychologists, getAttendanceReport, sendManualNotification, broadcastNotification, getActivityLogs.
+- Bloque A: Modelo ActivityLog para auditoría de actividades del administrador.
+- Bloque A: Campo active Boolean en modelo User para gestión de psicólogos activos/inactivos.
+- Bloque B: Reportes ampliados con horas pico, top psicólogos con tendencia mensual, tasa de asistencia global y mensual.
+- Bloque C: Notificaciones manual y masiva desde panel admin; registro de actividad con paginación.
+- Fix Twilio: studentPhone se lee desde cita, no desde usuario en citas.controller.ts.
+- UI Mobile: Sidebar con Agenda y Ayuda Urgente ocultos por rol.
+- UI Mobile: MainLayout con barra móvil plana, píldora animada e ítems por rol.
+- UI Mobile: TopBar con menú desplegable en avatar.
+- Docker: Eliminada dependencia de docker-entrypoint.sh, comando directo en CMD.
+
 **Actualizacion 2026-06-06 (Lote 2):**
 - Agregado `frontend/src/pages/NotFound.tsx`: Página 404 con diseño consistente y animaciones.
 - Actualizado `frontend/src/App.tsx`: Reemplazar fallback de Navigate con componente NotFound.
@@ -136,14 +149,16 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 
 ## Tareas pendientes
 
-- [ ] Pruebas E2E con Playwright para flujos autenticacion OAuth y citas.
+- [ ] Pruebas E2E con Playwright para flujos autenticacion OAuth, citas y panel admin.
 - [ ] Migracion a Prisma 8 cuando sea disponible.
 - [ ] Implementar Circuit Breaker para llamadas a servicios externos (Resend, Google Calendar, Twilio).
 - [ ] Agregar logging estructurado con pino.
-- [ ] Dashboard de administrador con graficos y estadisticas.
+- [ ] Graficos interactivos en panel admin (Chart.js o similares).
 - [ ] Soporte para reasignacion de psicologos en citas existentes.
 - [ ] Integracion de pagos para servicios premium.
 - [ ] API documentation con Swagger/OpenAPI.
+- [ ] Exportar reportes a PDF desde panel admin.
+- [ ] Sistema de backups automatizado para base de datos.
 
 ## Funcion de cada modulo
 
@@ -155,7 +170,7 @@ Equilibria es una plataforma web para gestion de citas y bienestar psicologico u
 - `backend/src/modules/patients`: listado e historial de pacientes atendidos por un psicologo. Requiere rol `PSYCHOLOGIST`.
 - `backend/src/modules/users`: perfil del usuario autenticado y cambio de password.
 - `backend/src/modules/notifications`: listado, conteo y marcado de notificaciones.
-- `backend/src/modules/admin`: estadisticas, usuarios, citas globales y reportes administrativos. Requiere rol `ADMIN`.
+- `backend/src/modules/admin`: estadisticas ampliadas, usuarios, citas globales, reportes detallados, auditoría de actividades, gestión de psicólogos, notificaciones manual/masiva. Requiere rol `ADMIN`. Panel con 7 pestañas funcionales.
 - `backend/src/middlewares`: autenticacion por token Supabase, control de roles y validacion con Zod.
 - `backend/src/lib/prisma.ts`: cliente Prisma compartido con conexion PostgreSQL directa.
 - `backend/src/lib/supabase.ts`: cliente Supabase de servidor para validar tokens de acceso.
@@ -204,7 +219,8 @@ Base de datos PostgreSQL administrada con Prisma.
 
 Entidades:
 
-- `User` (`users`): usuarios del sistema. Campos principales: `email`, `name`, `password`, `role`, `phone`, `address`, `faculty`, `semester`.
+- `User` (`users`): usuarios del sistema. Campos principales: `email`, `name`, `password`, `role`, `phone`, `address`, `faculty`, `semester`, `active` (Boolean, default true).
+- `ActivityLog` (`activity_logs`): registro de auditoría de actividades del administrador. Campos: `adminId`, `action`, `description`, `metadata`, `createdAt`.
 - `Cita` (`citas`): cita entre estudiante y profesional. Campos: `studentId`, `professionalId`, `date`, `type`, `mode`, `location`, `status`, `notes`, `psychNotes`, `studentPhone`, `googleEventId`.
 - `AvailableSlot` (`available_slots`): disponibilidad de profesionales por dia, rango horario y duracion.
 - `Notification` (`notifications`): mensajes para usuarios, con tipo, estado de lectura y fecha.
@@ -275,13 +291,26 @@ Notificaciones, todos requieren auth:
 
 Admin, todos requieren auth y rol `ADMIN`:
 
-- `GET /admin/stats`: estadisticas.
-- `GET /admin/users`: usuarios.
-- `GET /admin/citas`: citas globales.
-- `GET /admin/reports/cancellations`: reporte de cancelaciones.
-- `GET /admin/reports/psychologists`: reporte de psicologos.
+**Estadísticas y Usuarios:**
+- `GET /admin/stats`: estadísticas ampliadas (total usuarios, psicólogos disponibles, nuevos usuarios, citas por estado).
+- `GET /admin/users`: listar usuarios del sistema.
 - `PATCH /admin/users/:id`: actualizar usuario.
 - `DELETE /admin/users/:id`: eliminar usuario.
+- `PATCH /admin/users/:id/toggle-psychologist`: activar/desactivar psicólogo.
+
+**Citas y Reportes:**
+- `GET /admin/citas`: citas globales con filtros.
+- `GET /admin/citas/:userId`: citas de usuario específico.
+- `GET /admin/reports/peak-hours`: horas más solicitadas.
+- `GET /admin/reports/top-psychologists`: top psicólogos con tendencia.
+- `GET /admin/reports/attendance`: tasa de asistencia global y mensual.
+- `GET /admin/reports/cancellations`: reporte de cancelaciones.
+- `GET /admin/reports/psychologists`: desempeño de psicólogos.
+
+**Notificaciones y Auditoría:**
+- `POST /admin/notifications/send-manual`: notificación manual a usuario.
+- `POST /admin/notifications/broadcast`: notificación masiva.
+- `GET /admin/activity-logs`: registros de auditoría (paginado).
 
 ## Dependencias importantes
 

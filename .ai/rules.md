@@ -149,6 +149,24 @@ Endpoints:
 - `GET /api/patients/:id`: ficha + historial.
 - `PATCH /api/patients/:id`: actualizar notas clinicas.
 
+## Reglas del Panel Admin
+
+El panel administrativo expone estad\u00edsticas, gesti\u00f3n de usuarios, reportes y auditor\u00eda.
+
+Mantener estas reglas al modificar el panel admin:
+
+1. Solo usuarios con rol `ADMIN` pueden acceder a `/admin` y endpoints `/api/admin/*`.
+2. Las 7 pesta\u00f1as del panel (Dashboard, Pacientes, Citas, Psic\u00f3logos, Horarios, Reportes, Configuraci\u00f3n) est\u00e1n en `frontend/src/pages/Admin.tsx`.
+3. Usar `frontend/src/api/admin.ts` para consumir todos los endpoints administrativos.
+4. Campos de estad\u00edsticas: totalUsuarios, psychologistsAvailable, newUsersThisMonth, citasPorEstado.
+5. El campo `User.active` (Boolean) controla si un psic\u00f3logo est\u00e1 activo; usar `PATCH /admin/users/:id/toggle-psychologist` para cambiarlo.
+6. Modelo `ActivityLog` registra: adminId (admin que realiza acci\u00f3n), action (tipo: create, update, delete, etc), description (resumen), metadata (JSON con detalles), createdAt.
+7. Notificaciones manual: `POST /admin/notifications/send-manual` con userId y contenido.
+8. Notificaciones masiva: `POST /admin/notifications/broadcast` con filtro opcional (rol, facultad, etc) y contenido.
+9. Reportes: horas pico, top psic\u00f3logos con tendencia, tasa de asistencia global/mensual.
+10. Logs de auditor\u00eda paginados: `GET /admin/activity-logs?page=1&limit=20`.
+11. Usar `backend/src/modules/admin/admin.controller.ts` y `backend/src/modules/admin/admin.routes.ts`.
+
 ## Reglas de Notificaciones WhatsApp
 
 El envio de WhatsApp usa Twilio desde el backend.
@@ -167,9 +185,20 @@ Variables relacionadas:
 
 - Backend: `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_FROM`.
 
-## Cambios Recientes (2026-06-06)
+## Cambios Recientes (2026-06-07)
 
-**Lote 2 - Mejoras de UI y gestión de errores:**
+**Lote 3 - Panel Admin Ampliado:**
+- Bloque A: Panel Admin con 7 pesta\u00f1as (Dashboard, Pacientes, Citas, Psic\u00f3logos, Horarios, Reportes, Configuraci\u00f3n).
+- Bloque A: Nuevos endpoints en admin.controller.ts: togglePsychologist, getCitasByUser, getPeakHoursReport, getTopPsychologists, getAttendanceReport, sendManualNotification, broadcastNotification, getActivityLogs.
+- Bloque A: Modelo ActivityLog para auditor\u00eda con campos: adminId, action, description, metadata, createdAt.
+- Bloque A: Campo active Boolean en User para activar/desactivar psic\u00f3logos.
+- Bloque B: Reportes ampliados (horas pico, top psic\u00f3logos con tendencia mensual, tasa de asistencia).
+- Bloque C: Notificaciones manual y masiva desde admin; logs con paginaci\u00f3n.
+- Fix Twilio: studentPhone se lee desde cita en reminders.
+- UI Mobile: Sidebar y TopBar con cambios por rol; MainLayout con barra plana y p\u00edldora animada.
+- Docker: Comando directo en CMD, sin docker-entrypoint.sh.
+
+**Lote 2 - Mejoras de UI y gesti\u00f3n de errores:**
 - Agregado `frontend/src/pages/NotFound.tsx`: Página 404 con animaciones y diseño consistente.
 - Actualizado App.tsx: Usar NotFound en lugar de Navigate para rutas inexistentes.
 - Refactor Admin.tsx: Mejoras significativas en UI/UX, mejor estructura de datos.
